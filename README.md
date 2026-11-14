@@ -1,5 +1,29 @@
 # Topoforge
 
+<p align="center">
+  <a href="https://github.com/jahitjanberk/Topoforge/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/jahitjanberk/Topoforge?style=social"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/jahitjanberk/Topoforge?color=4f46e5"></a>
+  <a href="https://github.com/jahitjanberk/Topoforge/actions/workflows/test.yml"><img alt="Tests" src="https://github.com/jahitjanberk/Topoforge/actions/workflows/test.yml/badge.svg"></a>
+  <a href="https://github.com/jahitjanberk/Topoforge/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/jahitjanberk/Topoforge?color=4f46e5"></a>
+  <a href="https://nodejs.org"><img alt="Node.js 20 or newer" src="https://img.shields.io/badge/node-%E2%89%A520-339933?logo=nodedotjs&amp;logoColor=white"></a>
+  <img alt="Plain JavaScript, no build step" src="https://img.shields.io/badge/JavaScript-no%20build%20step-f7df1e?logo=javascript&amp;logoColor=black">
+</p>
+
+<p align="center">
+  <a href="https://jahitjanberk.github.io/Topoforge/"><img alt="Open the web app" src="https://img.shields.io/badge/WEB%20APP-JAHITJANBERK.GITHUB.IO%2FTOPOFORGE-4f46e5?style=for-the-badge&amp;logo=googlechrome&amp;logoColor=white"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/jahitjanberk/Topoforge/archive/refs/heads/main.zip"><img alt="Download the source as a ZIP" src="https://img.shields.io/badge/DOWNLOAD-SOURCE%20(.ZIP)-17171a?style=for-the-badge&amp;logo=github&amp;logoColor=white"></a>
+  <a href="#quick-start"><img alt="Run it locally" src="https://img.shields.io/badge/RUN%20LOCALLY-START.BAT%20%2F%20START.SH-3f3f46?style=for-the-badge&amp;logo=gnubash&amp;logoColor=white"></a>
+</p>
+
+<p align="center">
+  <a href="https://www.openstreetmap.org/copyright"><img alt="Map data: OpenStreetMap" src="https://img.shields.io/badge/MAP%20DATA-OPENSTREETMAP-7ebc6f?style=for-the-badge&amp;logo=openstreetmap&amp;logoColor=white"></a>
+  <a href="#downloads"><img alt="Exports 3MF" src="https://img.shields.io/badge/EXPORTS-3MF-15803d?style=for-the-badge&amp;logo=printables&amp;logoColor=white"></a>
+  <a href="#downloads"><img alt="Exports STL" src="https://img.shields.io/badge/EXPORTS-STL-b45309?style=for-the-badge&amp;logo=printables&amp;logoColor=white"></a>
+</p>
+
 Turn any place on Earth into a 3D-printable model. Find a location, draw the area you want, and download its terrain, with lakes, rivers, roads and buildings if you like, as a ready-to-slice 3MF or STL file.
 
 Everything runs in your browser. There's no account, no API key and no build step.
