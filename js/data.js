@@ -58,6 +58,12 @@ async function fetchOverpass(b, S) {
   const parts = [];
   if (S.buildings) parts.push(`way["building"](${bb});`, `relation["building"]["type"="multipolygon"](${bb});`);
   if (S.roads) parts.push(`way["highway"](${bb});`);
+  if (S.water) parts.push(
+    `way["natural"="water"](${bb});`, `relation["natural"="water"](${bb});`,
+    `way["landuse"="reservoir"](${bb});`, `relation["landuse"="reservoir"](${bb});`,
+    `way["waterway"="riverbank"](${bb});`, `relation["waterway"="riverbank"](${bb});`,
+    `way["waterway"~"^(river|canal)$"](${bb});`
+  );
   const query = `[out:json][timeout:120];(${parts.join('')});out geom qt;`;
   let lastErr;
   for (const ep of OVERPASS) {
@@ -67,7 +73,7 @@ async function fetchOverpass(b, S) {
       return await r.json();
     } catch (err) { lastErr = err; }
   }
-  throw new Error(`The OpenStreetMap server is busy (${lastErr && lastErr.message}). Try again in a minute, use a smaller area, or untick Buildings/Roads.`);
+  throw new Error(`The OpenStreetMap server is busy (${lastErr && lastErr.message}). Try again in a minute, use a smaller area, or untick Buildings/Roads/Water.`);
 }
 const ROADS = {
   motorway: [16, 1.6], trunk: [13, 1.5], primary: [11, 1.4], secondary: [10, 1.25], tertiary: [8, 1.15],
@@ -83,11 +89,59 @@ function buildingHeight(t) {
   if (h == null) h = BH[t.building] || 9;
   return Math.min(Math.max(h, 2), 900);
 }
+/* ---------- water ---------- */
+const FLOWING = new Set(['river', 'canal', 'stream', 'ditch', 'drain', 'lock', 'rapids', 'wastewater', 'stream_pool']);
+const isWaterArea = t => t.natural === 'water' || t.landuse === 'reservoir' || t.waterway === 'riverbank';
+// Lakes, ponds and reservoirs are flat ('lake'); river areas follow the terrain ('flow').
+const waterKind = t => t.waterway === 'riverbank' || FLOWING.has(t.water) ? 'flow' : 'lake';
+const RIVER_WIDTH = { river: 20, canal: 12 }; // metres, when the way has no width tag
+
+// Joins open way geometries end-to-end into closed rings (large lakes are split over many ways).
+// Pieces that can't be closed (cut off by the download area) are dropped.
+function assembleRings(ways) {
+  const key = p => p.lat + ',' + p.lon;
+  const rings = [], pool = ways.filter(w => w && w.length >= 2).map(w => w.slice());
+  while (pool.length) {
+    let ring = pool.pop();
+    for (let guard = 0; key(ring[0]) !== key(ring[ring.length - 1]) && guard < 10000; guard++) {
+      const end = key(ring[ring.length - 1]);
+      const i = pool.findIndex(w => key(w[0]) === end || key(w[w.length - 1]) === end);
+      if (i < 0) break;
+      const w = pool.splice(i, 1)[0];
+      ring = ring.concat((key(w[0]) === end ? w : w.reverse()).slice(1));
+    }
+    if (ring.length >= 4 && key(ring[0]) === key(ring[ring.length - 1])) rings.push(ring.slice(0, -1));
+  }
+  return rings;
+}
+// Groups inner rings under the outer ring that contains them.
+function ringsToPolygons(outers, inners, extra) {
+  const polys = outers.map(o => ({ outer: o, holes: [], ...extra }));
+  for (const h of inners) {
+    const p = polys.find(b => inRing(h[0].lon, h[0].lat, b.outer.map(q => ({ x: q.lon, y: q.lat }))));
+    if (p) p.holes.push(h);
+  }
+  return polys;
+}
+
 function parseOSM(js) {
-  const buildings = [], roads = [];
+  const buildings = [], roads = [], water = [], rivers = [];
   const closed = g => g && g.length >= 4 && g[0].lat === g[g.length - 1].lat && g[0].lon === g[g.length - 1].lon;
   for (const el of js.elements || []) {
     const t = el.tags || {};
+    if (isWaterArea(t)) {
+      if (el.type === 'way' && closed(el.geometry)) water.push({ outer: el.geometry.slice(0, -1), holes: [], kind: waterKind(t) });
+      else if (el.type === 'relation') {
+        const ways = role => (el.members || []).filter(m => m.type === 'way' && m.geometry && (role === 'inner') === (m.role === 'inner')).map(m => m.geometry);
+        water.push(...ringsToPolygons(assembleRings(ways('outer')), assembleRings(ways('inner')), { kind: waterKind(t) }));
+      }
+      continue;
+    }
+    if (el.type === 'way' && (t.waterway === 'river' || t.waterway === 'canal') && el.geometry && !(t.tunnel && t.tunnel !== 'no')) {
+      const w = parseFloat(String(t.width || '').replace(',', '.'));
+      rivers.push({ pts: el.geometry, width: isFinite(w) && w > 0 ? w : RIVER_WIDTH[t.waterway] });
+      continue;
+    }
     if (el.type === 'way' && t.building && closed(el.geometry)) buildings.push({ outer: el.geometry.slice(0, -1), holes: [], tags: t });
     else if (el.type === 'way' && t.highway && el.geometry && t.area !== 'yes') roads.push({ pts: el.geometry, tags: t });
     else if (el.type === 'relation' && t.building) {
@@ -98,8 +152,8 @@ function parseOSM(js) {
       buildings.push(...bs);
     }
   }
-  return { buildings, roads };
+  return { buildings, roads, water, rivers };
 }
 
-Object.assign(Mapcast, { TERRARIUM_URL, loadElevation, OVERPASS, fetchOverpass, ROADS, PATHS, BH, buildingHeight, parseOSM });
+Object.assign(Mapcast, { TERRARIUM_URL, loadElevation, OVERPASS, fetchOverpass, ROADS, PATHS, BH, buildingHeight, parseOSM, assembleRings });
 })();

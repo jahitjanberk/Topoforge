@@ -556,13 +556,18 @@ function pick(r) {
 /* =====================================================================
    Settings
    ===================================================================== */
-const sliders = [['sSize', 'oSize', v => `${v} mm`], ['sBase', 'oBase', v => `${v} mm`], ['sExag', 'oExag', v => `${(+v).toFixed(1)}×`], ['sBH', 'oBH', v => `${(+v).toFixed(1)}×`], ['sBMin', 'oBMin', v => `${(+v).toFixed(1)} mm`], ['sRW', 'oRW', v => `${(+v).toFixed(1)} mm`], ['sRH', 'oRH', v => `${(+v).toFixed(1)} mm`]];
+const sliders = [['sSize', 'oSize', v => `${v} mm`], ['sBase', 'oBase', v => `${v} mm`], ['sExag', 'oExag', v => `${(+v).toFixed(1)}×`], ['sBH', 'oBH', v => `${(+v).toFixed(1)}×`], ['sBMin', 'oBMin', v => `${(+v).toFixed(1)} mm`], ['sRW', 'oRW', v => `${(+v).toFixed(1)} mm`], ['sRH', 'oRH', v => `${(+v).toFixed(1)} mm`], ['sWD', 'oWD', v => `${(+v).toFixed(1)} mm`]];
 sliders.forEach(([s, o, f]) => { const el = $('#' + s); const upd = () => { $('#' + o).textContent = f(el.value); }; el.addEventListener('input', () => { upd(); updateAreaPanel(); }); el.addEventListener('change', save); upd(); });
 $('#sExag').addEventListener('input', () => { terrain3d.setExaggeration(+$('#sExag').value); if (state.view3d) setHint(); });
 $$('#detail button').forEach(b => b.onclick = () => { $$('#detail button').forEach(x => x.classList.toggle('active', x === b)); save(); });
-['lTerrain', 'lBuildings', 'lRoads', 'lPaths', 'cSea'].forEach(id => $('#' + id).addEventListener('change', () => { syncLayerUi(); updateAreaPanel(); save(); }));
+['lTerrain', 'lWater', 'lBuildings', 'lRoads', 'lPaths', 'cSea'].forEach(id => $('#' + id).addEventListener('change', () => { syncLayerUi(); updateAreaPanel(); save(); }));
 function syncLayerUi() {
-  $('#fExag').style.opacity = $('#lTerrain').checked ? 1 : .4;
+  const terrain = $('#lTerrain').checked;
+  $('#fExag').style.opacity = terrain ? 1 : .4;
+  // Water is cut into the terrain surface, so it needs terrain.
+  $('#lWater').disabled = !terrain;
+  $('#lWater').parentElement.style.opacity = terrain ? 1 : .4;
+  $('#fWater').style.opacity = terrain && $('#lWater').checked ? 1 : .4;
   $('#lPaths').disabled = !$('#lRoads').checked;
   $('#lPaths').parentElement.style.opacity = $('#lRoads').checked ? 1 : .4;
 }
@@ -572,7 +577,8 @@ function readSettings() {
     detail: +($('#detail button.active') || { dataset: { v: 0.7 } }).dataset.v,
     bMult: +$('#sBH').value, bMin: +$('#sBMin').value, roadMin: +$('#sRW').value, roadH: +$('#sRH').value,
     terrain: $('#lTerrain').checked, buildings: $('#lBuildings').checked, roads: $('#lRoads').checked,
-    paths: $('#lRoads').checked && $('#lPaths').checked, sea: $('#cSea').checked
+    paths: $('#lRoads').checked && $('#lPaths').checked, sea: $('#cSea').checked,
+    water: $('#lTerrain').checked && $('#lWater').checked, waterDepth: +$('#sWD').value
   };
 }
 

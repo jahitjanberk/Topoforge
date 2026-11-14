@@ -7,7 +7,8 @@ const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
 
 const { Bounds, toLocal, fromLocal, bbox, cleanRing, signedArea, inRing, distToRing } = Mapcast;
 const { loadElevation, fetchOverpass, parseOSM, buildingHeight, ROADS, PATHS } = Mapcast;
-const { buildTerrain, terrainSolid, addPrism, addRoadBox } = Mapcast;
+const { buildTerrain, terrainSolid, refineWater, splitWater, addPrism, addRoadBox } = Mapcast;
+const { buildWaterMask, WATER } = Mapcast;
 
 const tick = () => new Promise(r => setTimeout(r, 16));
 
@@ -28,25 +29,59 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
   const m2ll = (x, y) => fromLocal({ x: x / scale + cx, y: y / scale + cy }, o);
   const ll2m = (lat, lng) => { const p = toLocal({ lat, lng }, o); return { x: (p.x - cx) * scale, y: (p.y - cy) * scale }; };
 
-  const dlMsg = S.terrain && (S.buildings || S.roads) ? 'Downloading elevation and OpenStreetMap data…' : S.terrain ? 'Downloading elevation data…' : (S.buildings || S.roads) ? 'Downloading OpenStreetMap data…' : 'Building model…';
+  const wantWater = S.water && S.terrain; // water is cut into the terrain, so it needs terrain
+  const needOsm = S.buildings || S.roads || wantWater;
+  const dlMsg = S.terrain && needOsm ? 'Downloading elevation and OpenStreetMap data…' : S.terrain ? 'Downloading elevation data…' : needOsm ? 'Downloading OpenStreetMap data…' : 'Building model…';
   onStatus(dlMsg, 0);
   const [elev, osmJs] = await Promise.all([
     S.terrain ? loadElevation(bounds.pad(0.05), f => onStatus(dlMsg, lerp(P.download, f))) : null,
-    S.buildings || S.roads ? fetchOverpass(bounds.pad(0.01), S) : null
+    needOsm ? fetchOverpass(bounds.pad(0.01), { ...S, water: wantWater }) : null
   ]);
-  const osm = osmJs ? parseOSM(osmJs) : { buildings: [], roads: [] };
+  const osm = osmJs ? parseOSM(osmJs) : { buildings: [], roads: [], water: [], rivers: [] };
 
-  onStatus('Building terrain…', P.terrain); await tick();
-  const elevAt = elev ? (x, y) => { const ll = m2ll(x, y); const e = elev.sample(ll.lat, ll.lng); return S.sea ? Math.max(e, 0) : e; } : () => 0;
+  const seaLevelAt = (x, y) => { const ll = m2ll(x, y); return elev.sample(ll.lat, ll.lng); }; // unclamped DEM
+  const rawElevAt = (x, y) => { const e = seaLevelAt(x, y); return S.sea ? Math.max(e, 0) : e; };
   let h = null;
   if (elev) {
     h = Math.max(S.detail, elev.resM * scale * 0.7);
     h = Math.max(h, Math.sqrt(Math.abs(signedArea(ring)) / 220000));
   }
-  const T = buildTerrain(ring, h, elevAt);
+
+  let mask = null;
+  if (wantWater && elev && (osm.water.length || osm.rivers.length)) {
+    onStatus('Mapping lakes and rivers…', P.download[1]); await tick();
+    mask = buildWaterMask(osm, { bbox: bbox(ring), h, ll2m, scale, rawElevAt, minRiver: 1.2 });
+  }
+  // Lakes are flattened to their level; everything else follows the DEM.
+  const elevAt = !elev ? () => 0 : mask ? (x, y) => { const l = mask.levelAt(x, y); return l != null ? l : rawElevAt(x, y); } : rawElevAt;
+
+  onStatus('Building terrain…', P.terrain); await tick();
+  const T = buildTerrain(ring, h, elevAt, mask ? mask.shorePts : []);
   const zOf = e => S.base + (e - T.minE) * scale * S.exag;
   const zAt = (x, y) => zOf(elevAt(x, y));
-  const terrain = terrainSolid(T, zOf);
+
+  // Classify triangles as water: OSM water at the centroid, or sea (all corners at/below 0 m).
+  let water = [], waterShare = 0, terrain;
+  if (wantWater && elev) {
+    const { P: V, keep } = T, isWater = new Uint8Array(keep.length / 3);
+    const sea = S.sea ? V.map(p => seaLevelAt(p.x, p.y) <= 0) : null;
+    let wetArea = 0, allArea = 0;
+    for (let t = 0, i = 0; i < keep.length; i += 3, t++) {
+      const a = V[keep[i]], b = V[keep[i + 1]], c = V[keep[i + 2]];
+      const ar = Math.abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) / 2;
+      allArea += ar;
+      if ((mask && mask.kindAt((a.x + b.x + c.x) / 3, (a.y + b.y + c.y) / 3) !== WATER.NONE) || (sea && sea[keep[i]] && sea[keep[i + 1]] && sea[keep[i + 2]])) { isWater[t] = 1; wetArea += ar; }
+    }
+    waterShare = allArea ? wetArea / allArea : 0;
+    if (wetArea > 0) {
+      const depth = Math.min(S.waterDepth, S.base * 0.6); // never cut through the base
+      const R = refineWater(T, isWater); // remove zero-thickness pinches in the water solid
+      const split = splitWater(R.T, zOf, R.isWater, depth);
+      water = split.water;
+      terrain = terrainSolid(R.T, zOf, split.zs);
+    }
+  }
+  if (!terrain) terrain = terrainSolid(T, zOf);
 
   let buildings = [], nB = 0;
   if (S.buildings && osm.buildings.length) {
@@ -94,6 +129,7 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
   onStatus('Preparing preview…', P.done); await tick();
   const layers = [
     { id: 'terrain', name: S.terrain ? 'Terrain & base' : 'Base', color: '#e3d3b0', arr: new Float32Array(terrain) },
+    { id: 'water', name: 'Water', color: '#4a90d9', arr: new Float32Array(water) },
     { id: 'buildings', name: 'Buildings', color: '#fbfaf8', arr: new Float32Array(buildings) },
     { id: 'roads', name: 'Roads', color: '#52525b', arr: new Float32Array(roads) }
   ].filter(l => l.arr.length);
@@ -104,12 +140,14 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
     ['Footprint', `${(bx1 - bx0).toFixed(0)} × ${(by1 - by0).toFixed(0)} mm`], ['Height', `${maxZ.toFixed(1)} mm`],
     ['Scale', `1:${Number((1000 / scale).toPrecision(3)).toLocaleString()}`],
     ...(elev ? [['Elevation range', `${Math.round(T.minE)}–${Math.round(T.maxE)} m`]] : []),
+    ...(wantWater ? [['Water', `${(waterShare * 100).toFixed(waterShare < 0.1 ? 1 : 0)}% of area`]] : []),
     ...(S.buildings ? [['Buildings', nB.toLocaleString()]] : []), ...(S.roads ? [['Roads', nR.toLocaleString()]] : []),
     ['Triangles', tris.toLocaleString()], ['File size', `${(tris * 50 / 1048576).toFixed(1)} MB`]
   ];
   const notes = [];
   if (elev && elev.failed) notes.push(`${elev.failed} elevation tile(s) failed to load — those parts are flat.`);
   if (S.buildings && osmJs && !nB) notes.push('No buildings were found inside the area.');
+  if (wantWater && elev && !water.length) notes.push('No lakes, rivers or sea were found inside the area.');
   return { layers, stats, notes };
 }
 

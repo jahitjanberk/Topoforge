@@ -55,6 +55,7 @@
           <div class="lab">Include</div>
           <div class="chips">
             <label class="chip" style="--dot:#d9c7a3"><input type="checkbox" id="lTerrain" checked><span>Terrain</span></label>
+            <label class="chip" style="--dot:#4a90d9" title="Lakes, rivers and sea as a separate part for multi-colour printing"><input type="checkbox" id="lWater" checked><span>Water</span></label>
             <label class="chip" style="--dot:#ffffff"><input type="checkbox" id="lBuildings" checked><span>Buildings</span></label>
             <label class="chip" style="--dot:#9ca3af"><input type="checkbox" id="lRoads" checked><span>Roads</span></label>
             <label class="chip" style="--dot:#9ca3af"><input type="checkbox" id="lPaths"><span>Footpaths</span></label>
@@ -96,6 +97,10 @@
             <div class="field">
               <div class="lab"><span>Road height</span><output id="oRH"></output></div>
               <input type="range" id="sRH" min="0.2" max="2" step="0.1" value="0.6">
+            </div>
+            <div class="field" id="fWater">
+              <div class="lab"><span>Water depth</span><output id="oWD"></output></div>
+              <input type="range" id="sWD" min="0.4" max="2" step="0.1" value="0.8">
             </div>
             <label class="check"><input type="checkbox" id="cSea" checked>Flatten sea floor to sea level</label>
           </div>
@@ -168,6 +173,7 @@
 <script src="js/basemaps.js"></script>
 <script src="js/mesh.js"></script>
 <script src="js/stl.js"></script>
+<script src="js/water.js"></script>
 <script src="js/model.js"></script>
 <script src="js/generator.js"></script>
 <script src="js/terrain3d.js"></script>

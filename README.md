@@ -25,7 +25,8 @@ js/
   generator.js    runs model generation in a Web Worker (progress, cancel)
   worker.js       the Web Worker: loads geo/data/mesh/model and builds the model
   model.js        print area + settings → mesh layers (no DOM; runs in the worker)
-  mesh.js         terrain / building / road mesh builders
+  water.js        rasterised water mask: lake levels, rivers, shoreline points
+  mesh.js         terrain / water / building / road mesh builders
   data.js         elevation tiles + OpenStreetMap (Overpass) download
   geo.js          projection and 2D geometry helpers
   preview.js      three.js preview of the finished model
@@ -37,4 +38,13 @@ js/
 
 - Elevation: [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (Terrarium encoding). The same tiles drive the relief shading, the 3D view and the STL, so the relief you see is the relief you print.
 - Map tiles: [OpenStreetMap](https://www.openstreetmap.org/copyright) standard tiles, subject to the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/). Switch to a hosted provider before heavy use.
-- Buildings and roads: OpenStreetMap through the Overpass API.
+- Buildings, roads and water: OpenStreetMap through the Overpass API.
+
+## Water
+
+With **Water** on, lakes, reservoirs, rivers and canals from OpenStreetMap become a separate part (`*-water.stl`) for multi-colour printing. Sea is included as well when "Flatten sea floor" is on.
+
+- Lakes are flattened to one level (the median elevation over the lake). Rivers follow the terrain.
+- The terrain under water is recessed by the **Water depth** setting, and the water part fills that recess exactly. The two parts meet with no gap or overlap, and each is watertight.
+- Water features smaller than about 2 × 2 mm on the model are skipped. River lines are widened to stay printable.
+- Sea is detected by elevation (at or below 0 m), so land below sea level, such as Dutch polders, also shows up as water.
