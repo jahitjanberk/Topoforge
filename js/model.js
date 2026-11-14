@@ -253,10 +253,13 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
     onStatus(bMsg, P.buildings[0]); await tick();
     for (const [i, bd] of osm.buildings.entries()) {
       if (i % 500 === 0) onStatus(bMsg, lerp(P.buildings, i / osm.buildings.length));
-      const outer = cleanRing(bd.outer.map(p => ll2m(p.lat, p.lon)), 0.02);
+      let outer = cleanRing(bd.outer.map(p => ll2m(p.lat, p.lon)), 0.02);
       if (outer.length < 3 || Math.abs(signedArea(outer)) < 0.15) continue;
       if (!outer.every(p => inRing(p.x, p.y, ring))) continue;
-      const holes = bd.holes.map(hr => cleanRing(hr.map(p => ll2m(p.lat, p.lon)), 0.02)).filter(hr => hr.length >= 3);
+      let holes = bd.holes.map(hr => cleanRing(hr.map(p => ll2m(p.lat, p.lon)), 0.02)).filter(hr => hr.length >= 3);
+      // Footprint detail below 0.05 mm can't be printed: simplify, unless that makes it cross itself.
+      const so = simplifyDP(outer, 0.05), sh = holes.map(hr => simplifyDP(hr, 0.05)).filter(hr => hr.length >= 3 && Math.abs(signedArea(hr)) > 0.01);
+      if (so.length >= 3 && Math.abs(signedArea(so)) >= 0.15 && !hasCrossings([so, ...sh])) { outer = so; holes = sh; }
       const zs = outer.map(p => zAt(p.x, p.y)), zmin = Math.min(...zs), zmax = Math.max(...zs);
       const hm = Math.max(S.bMin, buildingHeight(bd.tags) * scale * S.bMult);
       const zb = Math.max(0.05, zmin - 0.4), zt = Math.max(zmin + hm, zmax + 0.3), bb = bbox(outer);
@@ -277,14 +280,34 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
   /* ---------- roads and route (pieces clipped at tile edges) ---------- */
   // Lays a polyline (model mm) onto the terrain as short boxes `w` wide, `height` above the
   // surface, skipping pieces that would overhang the print edge. Returns true if anything was laid.
-  const piece = elev ? Math.max(1.2, (h || 1) * 1.5) : 4;
-  const layLine = (partId, pts, w, height) => {
+  // Pieces are split only where the ground under them bends (by more than 0.05 mm), and kept
+  // short near the print outline (so the overhang rule below stays fine-grained). On flat ground a
+  // straight stretch is one piece; the old fixed 1.2 mm pieces made city models huge.
+  const ROAD_TOL = 0.05, MAX_PIECE = 15;
+  const pieceCuts = (a, b, len) => {
+    const at = t => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }), ts = [0, 1];
+    const zt = t => { const p = at(t); return zAt(p.x, p.y); };
+    const rec = (t0, z0, t1, z1) => {
+      const segLen = (t1 - t0) * len;
+      if (segLen <= 0.6) return;
+      const mid = at((t0 + t1) / 2);
+      let need = segLen > MAX_PIECE || distToRing(mid.x, mid.y, ring) < segLen;
+      if (!need && elev) for (const f of [0.25, 0.5, 0.75]) if (Math.abs(zt(t0 + (t1 - t0) * f) - (z0 + (z1 - z0) * f)) > ROAD_TOL) { need = true; break; }
+      if (!need) return;
+      const tm = (t0 + t1) / 2, zm = zt(tm);
+      rec(t0, z0, tm, zm); ts.push(tm); rec(tm, zm, t1, z1);
+    };
+    rec(0, zt(0), 1, zt(1));
+    return ts.sort((x, y) => x - y);
+  };
+  const layLine = (partId, ptsIn, w, height) => {
     let any = false;
+    const pts = simplifyDP(ptsIn, ROAD_TOL); // OSM curve detail far below what the model can show
     for (let i = 0; i < pts.length - 1; i++) {
       const a = pts[i], b = pts[i + 1], len = Math.hypot(b.x - a.x, b.y - a.y); if (len < 1e-4) continue;
-      const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len, n = Math.max(1, Math.ceil(len / piece));
+      const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len, cuts = pieceCuts(a, b, len), n = cuts.length - 1;
       for (let k = 0; k < n; k++) {
-        let p0 = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n }, p1 = { x: a.x + (b.x - a.x) * (k + 1) / n, y: a.y + (b.y - a.y) * (k + 1) / n };
+        let p0 = { x: a.x + (b.x - a.x) * cuts[k], y: a.y + (b.y - a.y) * cuts[k] }, p1 = { x: a.x + (b.x - a.x) * cuts[k + 1], y: a.y + (b.y - a.y) * cuts[k + 1] };
         if (k === 0) p0 = { x: p0.x - ux * w / 2, y: p0.y - uy * w / 2 };
         if (k === n - 1) p1 = { x: p1.x + ux * w / 2, y: p1.y + uy * w / 2 };
         const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2, m = w / 2;
@@ -385,6 +408,12 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
     ...(S.buildings ? [['Buildings', nB.toLocaleString()]] : []), ...(S.roads ? [['Roads', nR.toLocaleString()]] : []),
     ['Triangles', tris.toLocaleString()], ['File size', `${(tris * 50 / 1048576).toFixed(1)} MB`]
   ];
+  // Very large files freeze or crash some slicers: say so, and how to shrink the model.
+  const stlMB = tris * 50 / 1048576;
+  if (stlMB > 50) {
+    const big = layers.filter(l => ['buildings', 'roads'].includes(l.part)).reduce((s, l) => s + l.arr.length / 9, 0) > tris * 0.5;
+    notes.unshift(`This model is large (${stlMB.toFixed(0)} MB as STL, ${Math.round(tris).toLocaleString()} triangles); some slicers struggle with files this big. Prefer the 3MF download (much smaller), ${big ? 'untick Buildings or Roads, or ' : ''}use a smaller area${tiled ? '' : ', or split into tiles'}.`);
+  }
   if (osmError) {
     const skipped = [S.buildings && 'buildings', S.roads && 'roads', wantWater && 'lakes and rivers'].filter(Boolean).join(', ');
     notes.unshift(`The OpenStreetMap servers didn't respond, so this model has no ${skipped}${wantWater && S.sea ? ' (the sea is still included)' : ''}. Try Generate again in a few minutes to add them.`);

@@ -65,6 +65,8 @@ The terrain mesh is adaptive. Cells start large and are split, worst first, wher
 | Lake Thun, stepped | 207,890 | 148,052 (71%, with sparser contour pairs) |
 | Bernese Alps (steep) | 93,728 | 92,500 (99%) |
 
+Roads and buildings are simplified to what the model can show (0.05 mm). Road pieces are split only where the ground under them bends. Central Zurich at 3 km went from 38.2 MB to 20.4 MB this way (roads 391k → 173k triangles, buildings 360k → 206k). Models over 50 MB as STL get a warning with ways to shrink them, because some slicers freeze on very large files.
+
 On a synthetic test landscape the adaptive mesh uses 44% fewer triangles with the same height error as the even grid (max 0.33 mm, average 0.034 mm; see `test/mesh.test.mjs`).
 
 ## GPX routes
