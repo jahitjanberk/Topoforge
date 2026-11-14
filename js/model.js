@@ -32,10 +32,13 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
   const wantWater = S.water && S.terrain; // water is cut into the terrain, so it needs terrain
   const needOsm = S.buildings || S.roads || wantWater;
   const dlMsg = S.terrain && needOsm ? 'Downloading elevation and OpenStreetMap data…' : S.terrain ? 'Downloading elevation data…' : needOsm ? 'Downloading OpenStreetMap data…' : 'Building model…';
-  onStatus(dlMsg, 0);
+  // The OpenStreetMap servers can queue requests; show how long we've been waiting.
+  let elevFrac = S.terrain ? 0 : 1, waited = 0;
+  const dlStatus = () => onStatus(waited >= 3 ? `${dlMsg.replace('…', '')} — waiting for the OpenStreetMap server (${waited} s)…` : dlMsg, lerp(P.download, needOsm ? elevFrac * 0.5 : elevFrac));
+  dlStatus();
   const [elev, osmJs] = await Promise.all([
-    S.terrain ? loadElevation(bounds.pad(0.05), f => onStatus(dlMsg, lerp(P.download, f))) : null,
-    needOsm ? fetchOverpass(bounds.pad(0.01), { ...S, water: wantWater }) : null
+    S.terrain ? loadElevation(bounds.pad(0.05), f => { elevFrac = f; dlStatus(); }) : null,
+    needOsm ? fetchOverpass(bounds.pad(0.01), { ...S, water: wantWater }, ringLL, s => { waited = s; dlStatus(); }) : null
   ]);
   const osm = osmJs ? parseOSM(osmJs) : { buildings: [], roads: [], water: [], rivers: [] };
 
