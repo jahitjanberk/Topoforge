@@ -8,10 +8,18 @@ const { D2R, tileXY, inRing } = Mapcast;
 const TERRARIUM_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
 
 // Decodes one tile without the DOM, so this also runs inside a Web Worker.
-async function fetchBitmap(url) {
-  const r = await fetch(url, { mode: 'cors' });
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  return createImageBitmap(await r.blob());
+// Retries twice (0.5 s, then 1.5 s later) so a passing network blip doesn't flatten the terrain.
+async function fetchBitmap(url, tries = 3) {
+  for (let i = 0; ; i++) {
+    try {
+      const r = await fetch(url, { mode: 'cors' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return await createImageBitmap(await r.blob());
+    } catch (err) {
+      if (i >= tries - 1) throw err;
+      await new Promise(res => setTimeout(res, 500 * 3 ** i));
+    }
+  }
 }
 const makeCanvas = (w, h) => {
   if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, h);
@@ -55,10 +63,16 @@ async function loadElevation(b, onProgress = () => {}) {
 // Public Overpass servers that answer browser (CORS) requests, tried in order. The main server is
 // the most reliable but can queue requests for a while, so it gets the longest time limit.
 // (overpass.private.coffee was removed: it sends no CORS headers, so browsers always reject it.)
+// z. and lz4. are the two machines behind overpass-api.de: when the main address answers
+// "502 Gateway Timeout" (it does under load), one of them often still works.
+// (Regional servers such as overpass.osm.ch are fast but hold only their own country's data, so
+// areas near a border would silently lose buildings and water; they are deliberately not used.)
 const OVERPASS = [
-  { url: 'https://overpass-api.de/api/interpreter', timeout: 150000 },
-  { url: 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', timeout: 60000 },
-  { url: 'https://overpass.kumi.systems/api/interpreter', timeout: 60000 }
+  { url: 'https://overpass-api.de/api/interpreter', timeout: 120000 },
+  { url: 'https://z.overpass-api.de/api/interpreter', timeout: 90000 },
+  { url: 'https://lz4.overpass-api.de/api/interpreter', timeout: 60000 },
+  { url: 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', timeout: 45000 },
+  { url: 'https://overpass.kumi.systems/api/interpreter', timeout: 45000 }
 ];
 const overpassCache = new Map(); // query → parsed JSON; lives as long as the worker
 const CACHE_SIZE = 6;

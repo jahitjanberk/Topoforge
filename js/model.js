@@ -46,6 +46,7 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
   /* ---------- downloads ---------- */
   const wantWater = S.water && S.terrain; // water is cut into the terrain, so it needs terrain
   const needOsm = S.buildings || S.roads || wantWater;
+  let osmError = null;
   const dlMsg = S.terrain && needOsm ? 'Downloading elevation and OpenStreetMap data…' : S.terrain ? 'Downloading elevation data…' : needOsm ? 'Downloading OpenStreetMap data…' : 'Building model…';
   // The OpenStreetMap servers can queue requests; show how long we've been waiting.
   let elevFrac = S.terrain ? 0 : 1, waited = 0;
@@ -53,7 +54,9 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
   dlStatus();
   const [elev, osmJs] = await Promise.all([
     S.terrain ? loadElevation(bounds.pad(0.05), f => { elevFrac = f; dlStatus(); }) : null,
-    needOsm ? fetchOverpass(bounds.pad(0.01), { ...S, water: wantWater }, ringLL, s => { waited = s; dlStatus(); }) : null
+    // If the OpenStreetMap servers all fail, still build the terrain (unless that's all there'd be).
+    needOsm ? fetchOverpass(bounds.pad(0.01), { ...S, water: wantWater }, ringLL, s => { waited = s; dlStatus(); })
+      .catch(err => { if (!S.terrain) throw err; osmError = err; return null; }) : null
   ]);
   const osm = osmJs ? parseOSM(osmJs) : { buildings: [], roads: [], water: [], rivers: [] };
 
@@ -269,9 +272,13 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
     ...(S.buildings ? [['Buildings', nB.toLocaleString()]] : []), ...(S.roads ? [['Roads', nR.toLocaleString()]] : []),
     ['Triangles', tris.toLocaleString()], ['File size', `${(tris * 50 / 1048576).toFixed(1)} MB`]
   ];
+  if (osmError) {
+    const skipped = [S.buildings && 'buildings', S.roads && 'roads', wantWater && 'lakes and rivers'].filter(Boolean).join(', ');
+    notes.unshift(`The OpenStreetMap servers didn't respond, so this model has no ${skipped}${wantWater && S.sea ? ' (the sea is still included)' : ''}. Try Generate again in a few minutes to add them.`);
+  }
   if (elev && elev.failed) notes.push(`${elev.failed} elevation tile(s) failed to load — those parts are flat.`);
   if (S.buildings && osmJs && !nB) notes.push('No buildings were found inside the area.');
-  if (wantWater && elev && !has('water')) notes.push('No lakes, rivers or sea were found inside the area.');
+  if (wantWater && elev && !osmError && !has('water')) notes.push('No lakes, rivers or sea were found inside the area.');
   if (S.route && S.route.length && !routeLaid) notes.push('The route is outside the print area.');
   if (tiled && labelText) notes.push('The label plate is a separate piece.');
   return { layers, tiles: tiled ? tiles.map(t => ({ name: t.name })) : null, stats, notes };

@@ -57,3 +57,16 @@ test('tiles with stepped terrain and a non-rectangular (circle) area', async () 
   assert.equal(m.tiles.length, 6);
   assertAllWatertight(m);
 });
+
+test('when OpenStreetMap is down, the terrain is still built and the note says what is missing', async () => {
+  globalThis.__osmDown = true;
+  try {
+    const m = await buildModel(RING, { ...SETTINGS, water: true, route: null });
+    assert.deepEqual(m.layers.map(l => l.part), ['terrain']);
+    assertAllWatertight(m);
+    assert.match(m.notes[0], /no buildings, roads, lakes and rivers/);
+    assert.ok(!m.notes.some(n => /No lakes|No buildings/.test(n)), 'no misleading "nothing found" notes');
+    // Without terrain there would be nothing to print: report the error instead.
+    await assert.rejects(buildModel(RING, { ...SETTINGS, terrain: false, route: null }), /busy/);
+  } finally { globalThis.__osmDown = false; }
+});

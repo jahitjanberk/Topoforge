@@ -26,7 +26,8 @@ export function loadOfflineModel() {
   });
   // Synthetic OpenStreetMap: buildings (one straddling both tile seams, one with a courtyard),
   // a road and a residential street crossing the seams.
-  M.fetchOverpass = async () => ({
+  // Set globalThis.__osmDown = true to simulate every OpenStreetMap server failing.
+  M.fetchOverpass = async () => globalThis.__osmDown ? Promise.reject(new Error('The OpenStreetMap servers are busy (timed out).')) : ({
     elements: [
       { type: 'way', tags: { building: 'yes' }, geometry: sq(46.6995, 7.8645, 0.001) },
       { type: 'way', tags: { building: 'house' }, geometry: sq(46.6930, 7.8550, 0.0006) },
