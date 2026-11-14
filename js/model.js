@@ -5,7 +5,7 @@
 'use strict';
 const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
 
-const { Bounds, toLocal, fromLocal, bbox, cleanRing, signedArea, inRing, distToRing } = Mapcast;
+const { Bounds, toLocal, fromLocal, simplifyDP, haversineKm, bbox, cleanRing, signedArea, inRing, distToRing } = Mapcast;
 const { loadElevation, fetchOverpass, parseOSM, buildingHeight, ROADS, PATHS } = Mapcast;
 const { buildTerrain, terrainSolid, refineWater, splitWater, addPrism, addRoadBox } = Mapcast;
 const { buildWaterMask, WATER } = Mapcast;
@@ -101,31 +101,47 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
       if (addPrism(buildings, outer, holes, Math.max(0.05, zmin - 0.4), Math.max(zmin + hm, zmax + 0.3))) nB++;
     }
   }
+  // Lays a polyline (model mm) onto the terrain as short boxes `w` wide, `height` above the
+  // surface, skipping pieces that would overhang the print edge. Returns true if anything was laid.
+  const piece = elev ? Math.max(1.2, (h || 1) * 1.5) : 4;
+  const layLine = (out, pts, w, height) => {
+    let any = false;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1], len = Math.hypot(b.x - a.x, b.y - a.y); if (len < 1e-4) continue;
+      const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len, n = Math.max(1, Math.ceil(len / piece));
+      for (let k = 0; k < n; k++) {
+        let p0 = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n }, p1 = { x: a.x + (b.x - a.x) * (k + 1) / n, y: a.y + (b.y - a.y) * (k + 1) / n };
+        if (k === 0) p0 = { x: p0.x - ux * w / 2, y: p0.y - uy * w / 2 };
+        if (k === n - 1) p1 = { x: p1.x + ux * w / 2, y: p1.y + uy * w / 2 };
+        const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2, m = w / 2;
+        if (!inRing(mx, my, ring) || !inRing(p0.x, p0.y, ring) || !inRing(p1.x, p1.y, ring)) continue;
+        if (distToRing(mx, my, ring) < m || distToRing(p0.x, p0.y, ring) < m * 0.9 || distToRing(p1.x, p1.y, ring) < m * 0.9) continue;
+        addRoadBox(out, p0, p1, w, zAt, height); any = true;
+      }
+    }
+    return any;
+  };
+
   let roads = [], nR = 0;
   if (S.roads && osm.roads.length) {
     onStatus('Laying roads…', P.roads[0]); await tick();
-    const piece = elev ? Math.max(1.2, (h || 1) * 1.5) : 4;
     for (const [ri, rd] of osm.roads.entries()) {
       if (ri % 500 === 0) onStatus('Laying roads…', lerp(P.roads, ri / osm.roads.length));
       const t = rd.tags; if (t.tunnel && t.tunnel !== 'no') continue;
       const spec = ROADS[t.highway] || (S.paths ? PATHS[t.highway] : null); if (!spec) continue;
       const w = Math.max(spec[0] * scale, S.roadMin * spec[1]);
-      const pts = rd.pts.map(p => ll2m(p.lat, p.lon));
-      let any = false;
-      for (let i = 0; i < pts.length - 1; i++) {
-        const a = pts[i], b = pts[i + 1], len = Math.hypot(b.x - a.x, b.y - a.y); if (len < 1e-4) continue;
-        const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len, n = Math.max(1, Math.ceil(len / piece));
-        for (let k = 0; k < n; k++) {
-          let p0 = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n }, p1 = { x: a.x + (b.x - a.x) * (k + 1) / n, y: a.y + (b.y - a.y) * (k + 1) / n };
-          if (k === 0) p0 = { x: p0.x - ux * w / 2, y: p0.y - uy * w / 2 };
-          if (k === n - 1) p1 = { x: p1.x + ux * w / 2, y: p1.y + uy * w / 2 };
-          const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2, m = w / 2;
-          if (!inRing(mx, my, ring) || !inRing(p0.x, p0.y, ring) || !inRing(p1.x, p1.y, ring)) continue;
-          if (distToRing(mx, my, ring) < m || distToRing(p0.x, p0.y, ring) < m * 0.9 || distToRing(p1.x, p1.y, ring) < m * 0.9) continue;
-          addRoadBox(roads, p0, p1, w, zAt, S.roadH); any = true;
-        }
-      }
-      if (any) nR++;
+      if (layLine(roads, rd.pts.map(p => ll2m(p.lat, p.lon)), w, S.roadH)) nR++;
+    }
+  }
+
+  // GPX route: one raised strip per track segment, simplified to what the printer can resolve.
+  let route = [], routeKm = 0;
+  if (S.route && S.route.length) {
+    onStatus('Laying your route…', P.roads[1]); await tick();
+    for (const seg of S.route) {
+      const pts = simplifyDP(seg.map(p => ll2m(p.lat, p.lng)), 0.05);
+      layLine(route, pts, S.routeW, S.routeH);
+      for (let i = 1; i < seg.length; i++) routeKm += haversineKm(seg[i - 1], seg[i]);
     }
   }
 
@@ -134,7 +150,8 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
     { id: 'terrain', name: S.terrain ? 'Terrain & base' : 'Base', color: '#e3d3b0', arr: new Float32Array(terrain) },
     { id: 'water', name: 'Water', color: '#4a90d9', arr: new Float32Array(water) },
     { id: 'buildings', name: 'Buildings', color: '#fbfaf8', arr: new Float32Array(buildings) },
-    { id: 'roads', name: 'Roads', color: '#52525b', arr: new Float32Array(roads) }
+    { id: 'roads', name: 'Roads', color: '#52525b', arr: new Float32Array(roads) },
+    { id: 'route', name: 'Route', color: '#e11d48', arr: new Float32Array(route) }
   ].filter(l => l.arr.length);
   let maxZ = 0; for (const l of layers) for (let i = 2; i < l.arr.length; i += 3) if (l.arr[i] > maxZ) maxZ = l.arr[i];
   const [bx0, by0, bx1, by1] = bbox(ring);
@@ -144,6 +161,7 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
     ['Scale', `1:${Number((1000 / scale).toPrecision(3)).toLocaleString()}`],
     ...(elev ? [['Elevation range', `${Math.round(T.minE)}–${Math.round(T.maxE)} m`]] : []),
     ...(wantWater ? [['Water', `${(waterShare * 100).toFixed(waterShare < 0.1 ? 1 : 0)}% of area`]] : []),
+    ...(S.route && S.route.length ? [['Route', `${routeKm.toFixed(1)} km`]] : []),
     ...(S.buildings ? [['Buildings', nB.toLocaleString()]] : []), ...(S.roads ? [['Roads', nR.toLocaleString()]] : []),
     ['Triangles', tris.toLocaleString()], ['File size', `${(tris * 50 / 1048576).toFixed(1)} MB`]
   ];
@@ -151,6 +169,7 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
   if (elev && elev.failed) notes.push(`${elev.failed} elevation tile(s) failed to load — those parts are flat.`);
   if (S.buildings && osmJs && !nB) notes.push('No buildings were found inside the area.');
   if (wantWater && elev && !water.length) notes.push('No lakes, rivers or sea were found inside the area.');
+  if (S.route && S.route.length && !route.length) notes.push('The route is outside the print area.');
   return { layers, stats, notes };
 }
 

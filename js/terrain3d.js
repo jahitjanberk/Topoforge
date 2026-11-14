@@ -35,10 +35,15 @@ const areaData = ring => !ring || ring.length < 3 ? EMPTY : {
   geometry: { type: 'Polygon', coordinates: [[...ring, ring[0]].map(p => [p.lng, p.lat])] }
 };
 
+const routeData = segs => !segs || !segs.length ? EMPTY : {
+  type: 'Feature', properties: {},
+  geometry: { type: 'MultiLineString', coordinates: segs.map(s => s.map(p => [p.lng, p.lat])) }
+};
+
 // Leaflet zoom is based on 256px tiles, MapLibre's on 512px, hence the ±1.
 function createTerrainView(container) {
   let ml = null, creating = null;
-  const want = { relief: true, exaggeration: 1.5, ring: null };
+  const want = { relief: true, exaggeration: 1.5, ring: null, route: null };
 
   function applyRelief() {
     if (ml && ml.isStyleLoaded()) ml.setLayoutProperty('hillshade', 'visibility', want.relief ? 'visible' : 'none');
@@ -52,13 +57,14 @@ function createTerrainView(container) {
       attributionControl: { compact: true },
       style: {
         version: 8,
-        sources: { base: osmSource(), dem: demSource(), shade: demSource(), area: { type: 'geojson', data: areaData(want.ring) } },
+        sources: { base: osmSource(), dem: demSource(), shade: demSource(), area: { type: 'geojson', data: areaData(want.ring) }, route: { type: 'geojson', data: routeData(want.route) } },
         layers: [
           { id: 'sky', type: 'background', paint: { 'background-color': '#dfe7ee' } },
           { id: 'base', type: 'raster', source: 'base' },
           { id: 'hillshade', type: 'hillshade', source: 'shade', paint: { 'hillshade-exaggeration': 0.4, 'hillshade-shadow-color': '#3d3426' } },
           { id: 'area-fill', type: 'fill', source: 'area', paint: { 'fill-color': ACCENT, 'fill-opacity': 0.14 } },
-          { id: 'area-line', type: 'line', source: 'area', paint: { 'line-color': ACCENT, 'line-width': 3 } }
+          { id: 'area-line', type: 'line', source: 'area', paint: { 'line-color': ACCENT, 'line-width': 3 } },
+          { id: 'route-line', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#e11d48', 'line-width': 3.5 } }
         ],
         terrain: { source: 'dem', exaggeration: want.exaggeration }
       }
@@ -91,6 +97,13 @@ function createTerrainView(container) {
     },
 
     setRelief(on) { want.relief = on; applyRelief(); },
+
+    // segs: [[{lat,lng}]] GPX route segments, or null.
+    setRoute(segs) {
+      want.route = segs;
+      const src = ml && ml.getSource('route');
+      if (src) src.setData(routeData(segs));
+    },
 
     setExaggeration(x) {
       want.exaggeration = x;

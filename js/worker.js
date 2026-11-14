@@ -6,7 +6,7 @@
 importScripts(
   'https://cdn.jsdelivr.net/npm/delaunator@5.1.0/delaunator.min.js',
   'https://cdn.jsdelivr.net/npm/earcut@3.2.4/dist/earcut.min.js',
-  'geo.js', 'data.js', 'mesh.js', 'water.js', 'model.js'
+  'geo.js', 'gpx.js', 'data.js', 'mesh.js', 'water.js', 'model.js'
 );
 
 self.onmessage = async e => {

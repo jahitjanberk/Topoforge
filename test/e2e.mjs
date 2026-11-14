@@ -116,6 +116,23 @@ const SCENARIOS = {
     check('regenerating the same area reuses downloaded data', !again.failed && again.ms < 15000, `${again.ms} ms`);
     await screenshot('town.png');
   },
+  async route() {
+    // A loop up to Harder Kulm above Interlaken, imported through the real file input.
+    const pts = []; for (let i = 0; i <= 60; i++) { const t = i / 60 * 2 * Math.PI; pts.push([46.697 + 0.006 * Math.sin(t), 7.862 + 0.012 * Math.cos(t)]); }
+    const gpx = `<gpx><trk><name>E2E loop</name><trkseg>${pts.map(([la, lo]) => `<trkpt lat="${la}" lon="${lo}"/>`).join('')}</trkseg></trk></gpx>`;
+    await evaluate(`(() => { if (!document.querySelector('#preview').classList.contains('hidden')) document.querySelector('#pvClose').click();
+      for (const id of ['lWater', 'lBuildings', 'lRoads']) { const c = document.getElementById(id); if (c.checked) c.click(); }
+      const dt = new DataTransfer(); dt.items.add(new File([${JSON.stringify(gpx)}], 'loop.gpx', { type: 'application/gpx+xml' }));
+      const input = document.querySelector('#routeFile'); input.files = dt.files; input.dispatchEvent(new Event('change')); return true; })()`);
+    await sleep(800);
+    const ui = await evaluate(`({ info: document.querySelector('#routeInfo').textContent.replace(/\\s+/g, ' ').trim(), chip: !document.getElementById('lRoute').parentElement.classList.contains('hidden'), shape: !!window.__mapcast.state.shape })`);
+    check('GPX import shows the route and frames the area', ui.info.includes('E2E loop') && ui.chip && ui.shape, JSON.stringify(ui));
+    const r = await generate();
+    check('route generates as its own part', !r.failed && !!r.parts.route, `${r.ms} ms · ${r.status}`);
+    check('route part is closed', !!r.parts.route && partsOk(r.parts), JSON.stringify(r.parts.route));
+    await screenshot('route.png');
+    await evaluate(`document.querySelector('#pvClose').click(), document.querySelector('#routeDel').click(), true`);
+  },
   async cancel() {
     await setArea(46.5586, 7.8357, 11, { lTerrain: 1 });
     await evaluate(`document.querySelector('#detail button[data-v="0.4"]').click(), true`);

@@ -15,7 +15,7 @@ const { toSTL, download } = Mapcast;
 const ACCENT = '#f25c2a';
 const STORE = 'mapcast-v1';
 
-const state = { tool: 'select', shape: null, place: '', relief: true, view3d: false };
+const state = { tool: 'select', shape: null, place: '', relief: true, view3d: false, route: null };
 const keys = { shift: false, alt: false, space: false };
 const history = [];
 let busy = false;
@@ -458,6 +458,60 @@ $('#useView').onclick = () => {
 };
 
 /* =====================================================================
+   GPX route
+   ===================================================================== */
+const ROUTE_STORE = 'mapcast-route-v1';
+const ROUTE_COLOR = '#e11d48';
+let routeLine = null;
+function setRoute(route, { fit = false, persist = true } = {}) {
+  state.route = route;
+  if (routeLine) { routeLine.remove(); routeLine = null; }
+  if (route) routeLine = L.polyline(route.segs, { color: ROUTE_COLOR, weight: 3.5, opacity: .9, interactive: false }).addTo(map);
+  terrain3d.setRoute(route ? route.segs : null);
+  const info = $('#routeInfo');
+  info.classList.toggle('hidden', !route);
+  if (route) {
+    info.innerHTML = `<i class="route-dot"></i><span class="route-name" title="${escapeHtml(route.name)}">${escapeHtml(route.name)}</span><span class="route-km">${route.km.toFixed(1)} km</span>
+      <button class="iconbtn" id="routeFit" title="Fit the print area to the route"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+      <button class="iconbtn" id="routeDel" title="Remove route"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+    $('#routeFit').onclick = fitAreaToRoute;
+    $('#routeDel').onclick = () => setRoute(null);
+  }
+  $('#routeImport').textContent = route ? 'Replace GPX route…' : 'Import a GPX route…';
+  syncLayerUi(); updateAreaPanel();
+  if (persist) { try { route ? localStorage.setItem(ROUTE_STORE, JSON.stringify(route)) : localStorage.removeItem(ROUTE_STORE); } catch (e) { /* storage full/unavailable */ } }
+  if (fit && route) fitAreaToRoute();
+}
+function fitAreaToRoute() {
+  if (!state.route) return;
+  const b = L.latLngBounds(state.route.segs.flat()), c = b.getCenter();
+  const w = map.distance([c.lat, b.getWest()], [c.lat, b.getEast()]), h = map.distance([b.getSouth(), c.lng], [b.getNorth(), c.lng]);
+  history.push(cloneShape(state.shape));
+  state.shape = { type: 'rect', c, hw: Math.max(MIN, w * 0.56), hh: Math.max(MIN, h * 0.56), rot: 0 }; // ~12% margin
+  commitShape();
+  map.fitBounds(L.latLngBounds(shapeRing(state.shape, 16)), { padding: [60, 60], animate: !state.view3d });
+  if (state.view3d) terrain3d.fitArea(shapeRing(state.shape, 64));
+}
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+async function importRouteFile(file) {
+  if (!file) return;
+  try {
+    const r = Mapcast.parseGPX(await file.text(), file.name.replace(/\.gpx$/i, ''));
+    // A brand-new route usually means "print this": frame it unless an area is already drawn around it.
+    const inside = state.shape && L.latLngBounds(shapeRing(state.shape, 64)).contains(L.latLngBounds(r.segs.flat()));
+    setRoute(r, { fit: !inside });
+    $('#lRoute').checked = true; syncLayerUi(); save();
+    flash(`Route loaded: <b>${escapeHtml(r.name)}</b> · ${r.km.toFixed(1)} km`);
+  } catch (err) { flash(escapeHtml(err.message || 'Could not read that file.')); }
+}
+$('#routeImport').onclick = () => $('#routeFile').click();
+$('#routeFile').onchange = e => { importRouteFile(e.target.files[0]); e.target.value = ''; };
+// Drop a .gpx file anywhere on the map.
+$('#mapwrap').addEventListener('dragover', e => { if ([...e.dataTransfer.items].some(i => i.kind === 'file')) { e.preventDefault(); $('#mapwrap').classList.add('dropping'); } });
+$('#mapwrap').addEventListener('dragleave', e => { if (e.target === $('#mapwrap') || !$('#mapwrap').contains(e.relatedTarget)) $('#mapwrap').classList.remove('dropping'); });
+$('#mapwrap').addEventListener('drop', e => { e.preventDefault(); $('#mapwrap').classList.remove('dropping'); importRouteFile(e.dataTransfer.files[0]); });
+
+/* =====================================================================
    Area panel
    ===================================================================== */
 let areaPanelType = null;
@@ -556,11 +610,11 @@ function pick(r) {
 /* =====================================================================
    Settings
    ===================================================================== */
-const sliders = [['sSize', 'oSize', v => `${v} mm`], ['sBase', 'oBase', v => `${v} mm`], ['sExag', 'oExag', v => `${(+v).toFixed(1)}×`], ['sBH', 'oBH', v => `${(+v).toFixed(1)}×`], ['sBMin', 'oBMin', v => `${(+v).toFixed(1)} mm`], ['sRW', 'oRW', v => `${(+v).toFixed(1)} mm`], ['sRH', 'oRH', v => `${(+v).toFixed(1)} mm`], ['sWD', 'oWD', v => `${(+v).toFixed(1)} mm`]];
+const sliders = [['sSize', 'oSize', v => `${v} mm`], ['sBase', 'oBase', v => `${v} mm`], ['sExag', 'oExag', v => `${(+v).toFixed(1)}×`], ['sBH', 'oBH', v => `${(+v).toFixed(1)}×`], ['sBMin', 'oBMin', v => `${(+v).toFixed(1)} mm`], ['sRW', 'oRW', v => `${(+v).toFixed(1)} mm`], ['sRH', 'oRH', v => `${(+v).toFixed(1)} mm`], ['sWD', 'oWD', v => `${(+v).toFixed(1)} mm`], ['sRtW', 'oRtW', v => `${(+v).toFixed(1)} mm`], ['sRtH', 'oRtH', v => `${(+v).toFixed(1)} mm`]];
 sliders.forEach(([s, o, f]) => { const el = $('#' + s); const upd = () => { $('#' + o).textContent = f(el.value); }; el.addEventListener('input', () => { upd(); updateAreaPanel(); }); el.addEventListener('change', save); upd(); });
 $('#sExag').addEventListener('input', () => { terrain3d.setExaggeration(+$('#sExag').value); if (state.view3d) setHint(); });
 $$('#detail button').forEach(b => b.onclick = () => { $$('#detail button').forEach(x => x.classList.toggle('active', x === b)); save(); });
-['lTerrain', 'lWater', 'lBuildings', 'lRoads', 'lPaths', 'cSea'].forEach(id => $('#' + id).addEventListener('change', () => { syncLayerUi(); updateAreaPanel(); save(); }));
+['lTerrain', 'lWater', 'lBuildings', 'lRoads', 'lPaths', 'lRoute', 'cSea'].forEach(id => $('#' + id).addEventListener('change', () => { syncLayerUi(); updateAreaPanel(); save(); }));
 function syncLayerUi() {
   const terrain = $('#lTerrain').checked;
   $('#fExag').style.opacity = terrain ? 1 : .4;
@@ -568,6 +622,9 @@ function syncLayerUi() {
   $('#lWater').disabled = !terrain;
   $('#lWater').parentElement.style.opacity = terrain ? 1 : .4;
   $('#fWater').style.opacity = terrain && $('#lWater').checked ? 1 : .4;
+  // The Route chip only shows once a GPX route is loaded.
+  $('#lRoute').parentElement.classList.toggle('hidden', !state.route);
+  $('#fRoute').classList.toggle('hidden', !state.route);
   $('#lPaths').disabled = !$('#lRoads').checked;
   $('#lPaths').parentElement.style.opacity = $('#lRoads').checked ? 1 : .4;
 }
@@ -578,7 +635,8 @@ function readSettings() {
     bMult: +$('#sBH').value, bMin: +$('#sBMin').value, roadMin: +$('#sRW').value, roadH: +$('#sRH').value,
     terrain: $('#lTerrain').checked, buildings: $('#lBuildings').checked, roads: $('#lRoads').checked,
     paths: $('#lRoads').checked && $('#lPaths').checked, sea: $('#cSea').checked,
-    water: $('#lTerrain').checked && $('#lWater').checked, waterDepth: +$('#sWD').value
+    water: $('#lTerrain').checked && $('#lWater').checked, waterDepth: +$('#sWD').value,
+    route: state.route && $('#lRoute').checked ? state.route.segs : null, routeW: +$('#sRtW').value, routeH: +$('#sRtH').value
   };
 }
 
@@ -586,7 +644,7 @@ function readSettings() {
 function save() {
   try {
     const s = state.shape, ser = s ? { ...s, c: s.c ? [s.c.lat, s.c.lng] : undefined, pts: s.pts ? s.pts.map(p => [p.lat, p.lng]) : undefined } : null;
-    const settings = {}; $$('#panel input').forEach(i => { if (i.id && i.id !== 'q' && !i.id.startsWith('i')) settings[i.id] = i.type === 'checkbox' ? i.checked : i.value; });
+    const settings = {}; $$('#panel input').forEach(i => { if (i.id && i.id !== 'q' && i.type !== 'file' && !i.id.startsWith('i')) settings[i.id] = i.type === 'checkbox' ? i.checked : i.value; });
     settings.detail = ($('#detail button.active') || {}).dataset?.v;
     localStorage.setItem(STORE, JSON.stringify({ shape: ser, settings, view: [map.getCenter().lat, map.getCenter().lng, map.getZoom()], place: state.place, relief: state.relief, view3d: state.view3d }));
   } catch (e) { /* storage unavailable */ }
@@ -659,6 +717,7 @@ function slug() {
 /* ---------- boot ---------- */
 const saved = load();
 setRelief(state.relief);
+try { const r = JSON.parse(localStorage.getItem(ROUTE_STORE) || 'null'); if (r && r.segs) setRoute(r, { persist: false }); } catch (e) { /* ignore */ }
 syncLayerUi();
 setTool('select');
 if (saved && saved.view3d) set3D(true);

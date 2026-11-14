@@ -57,8 +57,12 @@ function simplifyDP(pts, tol) {
   const stack = [[0, pts.length - 1]];
   while (stack.length) {
     const [s, e] = stack.pop(); let md = 0, mi = -1;
-    const a = pts[s], b = pts[e], dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1e-9;
-    for (let i = s + 1; i < e; i++) { const d = Math.abs(dy * pts[i].x - dx * pts[i].y + b.x * a.y - b.y * a.x) / l; if (d > md) { md = d; mi = i; } }
+    const a = pts[s], b = pts[e], dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy);
+    for (let i = s + 1; i < e; i++) {
+      // When the ends coincide (a closed loop) there is no line: measure from the end point instead.
+      const d = l > 1e-12 ? Math.abs(dy * pts[i].x - dx * pts[i].y + b.x * a.y - b.y * a.x) / l : Math.hypot(pts[i].x - a.x, pts[i].y - a.y);
+      if (d > md) { md = d; mi = i; }
+    }
     if (md > tol) { keep[mi] = 1; stack.push([s, mi], [mi, e]); }
   }
   return pts.filter((_, i) => keep[i]);
