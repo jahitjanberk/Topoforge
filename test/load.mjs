@@ -11,7 +11,7 @@ export const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..'
 const FILES = [
   'node_modules/delaunator/delaunator.min.js',
   'node_modules/earcut/dist/earcut.min.js',
-  'js/geo.js', 'js/gpx.js', 'js/data.js', 'js/mesh.js', 'js/label.js', 'js/stl.js'
+  'js/geo.js', 'js/gpx.js', 'js/data.js', 'js/mesh.js', 'js/label.js', 'js/steps.js', 'js/stl.js'
 ];
 
 let loaded = null;

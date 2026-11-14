@@ -38,6 +38,7 @@ js/
   water.js        rasterised water mask: lake levels, rivers, shoreline points
   gpx.js          GPX parser (tracks + routes) and route simplification
   label.js        text → traced outlines for the raised label
+  steps.js        stepped terrain: height rounding + contour point pairs
   mesh.js         terrain / water / building / road mesh builders
   data.js         elevation tiles + OpenStreetMap (Overpass) download
   geo.js          projection and 2D geometry helpers
@@ -59,6 +60,10 @@ js/
 ## Label
 
 Type a **Label on the base** (or click *Use place name*) to add a plate along the front edge of the model, with the text raised on it as its own `*-label.stl` part. The plate is part of the base. Text height scales with the model width, and long text is shrunk to fit. The text is drawn in a bold system font, traced into outlines (letter holes kept), and extruded, so any font or script the browser can draw works.
+
+## Stepped terrain
+
+Set **Terrain surface** to *Stepped* for flat terraces like stacked contour layers, with **Step height** in model millimetres. Heights are rounded down to whole steps, and mesh points are placed in pairs straddling each contour line, so every step edge is a near-vertical wall. The surface is still a single heightfield, so water, buildings, roads, routes and labels all work as usual. Expect about twice the triangles of the smooth surface.
 
 ## Water
 

@@ -35,7 +35,9 @@ function buildTerrain(ring, h, elevAt, extraPts = []) {
       return false;
     };
     const add = p => { const k = cellKey(p.x, p.y); (grid.get(k) || grid.set(k, []).get(k)).push(p); P.push(p); };
-    for (const p of extraPts) if (inRing(p.x, p.y, ring) && distToRing(p.x, p.y, ring) > h * 0.5 && !near(p.x, p.y, h * 0.3)) add({ x: p.x, y: p.y });
+    // Forced points (contour pairs for stepped terrain) go in as-is: they are deliberately close.
+    for (const p of extraPts) if (p.force && inRing(p.x, p.y, ring) && distToRing(p.x, p.y, ring) > h * 0.5) add({ x: p.x, y: p.y });
+    for (const p of extraPts) if (!p.force && inRing(p.x, p.y, ring) && distToRing(p.x, p.y, ring) > h * 0.5 && !near(p.x, p.y, h * 0.3)) add({ x: p.x, y: p.y });
     const [minx, miny, maxx, maxy] = bbox(ring);
     let row = 0;
     for (let y = miny + h * 0.5; y < maxy; y += h * 0.866, row++)

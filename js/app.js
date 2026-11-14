@@ -610,10 +610,12 @@ function pick(r) {
 /* =====================================================================
    Settings
    ===================================================================== */
-const sliders = [['sSize', 'oSize', v => `${v} mm`], ['sBase', 'oBase', v => `${v} mm`], ['sExag', 'oExag', v => `${(+v).toFixed(1)}×`], ['sBH', 'oBH', v => `${(+v).toFixed(1)}×`], ['sBMin', 'oBMin', v => `${(+v).toFixed(1)} mm`], ['sRW', 'oRW', v => `${(+v).toFixed(1)} mm`], ['sRH', 'oRH', v => `${(+v).toFixed(1)} mm`], ['sWD', 'oWD', v => `${(+v).toFixed(1)} mm`], ['sRtW', 'oRtW', v => `${(+v).toFixed(1)} mm`], ['sRtH', 'oRtH', v => `${(+v).toFixed(1)} mm`], ['sLblH', 'oLblH', v => `${(+v).toFixed(1)} mm`]];
+const sliders = [['sSize', 'oSize', v => `${v} mm`], ['sBase', 'oBase', v => `${v} mm`], ['sExag', 'oExag', v => `${(+v).toFixed(1)}×`], ['sBH', 'oBH', v => `${(+v).toFixed(1)}×`], ['sBMin', 'oBMin', v => `${(+v).toFixed(1)} mm`], ['sRW', 'oRW', v => `${(+v).toFixed(1)} mm`], ['sRH', 'oRH', v => `${(+v).toFixed(1)} mm`], ['sWD', 'oWD', v => `${(+v).toFixed(1)} mm`], ['sRtW', 'oRtW', v => `${(+v).toFixed(1)} mm`], ['sRtH', 'oRtH', v => `${(+v).toFixed(1)} mm`], ['sLblH', 'oLblH', v => `${(+v).toFixed(1)} mm`], ['sStep', 'oStep', v => `${(+v).toFixed(1)} mm`]];
 sliders.forEach(([s, o, f]) => { const el = $('#' + s); const upd = () => { $('#' + o).textContent = f(el.value); }; el.addEventListener('input', () => { upd(); updateAreaPanel(); }); el.addEventListener('change', save); upd(); });
 $('#sExag').addEventListener('input', () => { terrain3d.setExaggeration(+$('#sExag').value); if (state.view3d) setHint(); });
 $$('#detail button').forEach(b => b.onclick = () => { $$('#detail button').forEach(x => x.classList.toggle('active', x === b)); save(); });
+const setSurface = v => { $$('#surface button').forEach(x => x.classList.toggle('active', x.dataset.v === v)); syncLayerUi(); };
+$$('#surface button').forEach(b => b.onclick = () => { setSurface(b.dataset.v); save(); });
 ['lTerrain', 'lWater', 'lBuildings', 'lRoads', 'lPaths', 'lRoute', 'cSea'].forEach(id => $('#' + id).addEventListener('change', () => { syncLayerUi(); updateAreaPanel(); save(); }));
 $('#tLabel').addEventListener('change', save);
 $('#labelPlace').onclick = () => {
@@ -624,6 +626,8 @@ $('#labelPlace').onclick = () => {
 function syncLayerUi() {
   const terrain = $('#lTerrain').checked;
   $('#fExag').style.opacity = terrain ? 1 : .4;
+  $('#fSurface').style.opacity = terrain ? 1 : .4;
+  $('#fStep').classList.toggle('hidden', !(terrain && $('#surface button.active')?.dataset.v === 'stepped'));
   // Water is cut into the terrain surface, so it needs terrain.
   $('#lWater').disabled = !terrain;
   $('#lWater').parentElement.style.opacity = terrain ? 1 : .4;
@@ -643,7 +647,8 @@ function readSettings() {
     paths: $('#lRoads').checked && $('#lPaths').checked, sea: $('#cSea').checked,
     water: $('#lTerrain').checked && $('#lWater').checked, waterDepth: +$('#sWD').value,
     route: state.route && $('#lRoute').checked ? state.route.segs : null, routeW: +$('#sRtW').value, routeH: +$('#sRtH').value,
-    label: $('#tLabel').value.trim(), labelH: +$('#sLblH').value
+    label: $('#tLabel').value.trim(), labelH: +$('#sLblH').value,
+    stepped: $('#lTerrain').checked && ($('#surface button.active') || {}).dataset?.v === 'stepped', stepMm: +$('#sStep').value
   };
 }
 
@@ -653,6 +658,7 @@ function save() {
     const s = state.shape, ser = s ? { ...s, c: s.c ? [s.c.lat, s.c.lng] : undefined, pts: s.pts ? s.pts.map(p => [p.lat, p.lng]) : undefined } : null;
     const settings = {}; $$('#panel input').forEach(i => { if (i.id && i.id !== 'q' && i.type !== 'file' && !i.id.startsWith('i')) settings[i.id] = i.type === 'checkbox' ? i.checked : i.value; });
     settings.detail = ($('#detail button.active') || {}).dataset?.v;
+    settings.surface = ($('#surface button.active') || {}).dataset?.v;
     localStorage.setItem(STORE, JSON.stringify({ shape: ser, settings, view: [map.getCenter().lat, map.getCenter().lng, map.getZoom()], place: state.place, relief: state.relief, view3d: state.view3d }));
   } catch (e) { /* storage unavailable */ }
 }
@@ -664,6 +670,7 @@ function load() {
     if (d.settings) {
       for (const [k, v] of Object.entries(d.settings)) { const i = $('#' + k); if (!i) continue; if (i.type === 'checkbox') i.checked = v; else i.value = v; i.dispatchEvent(new Event('input')); }
       if (d.settings.detail) $$('#detail button').forEach(b => b.classList.toggle('active', b.dataset.v === d.settings.detail));
+      if (d.settings.surface) $$('#surface button').forEach(b => b.classList.toggle('active', b.dataset.v === d.settings.surface));
     }
     if (d.shape) { const s = d.shape; if (s.c) s.c = L.latLng(s.c[0], s.c[1]); if (s.pts) s.pts = s.pts.map(p => L.latLng(p[0], p[1])); state.shape = s; }
     state.place = d.place || '';

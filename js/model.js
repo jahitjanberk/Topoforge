@@ -10,6 +10,7 @@ const { loadElevation, fetchOverpass, parseOSM, buildingHeight, ROADS, PATHS } =
 const { buildTerrain, terrainSolid, refineWater, splitWater, addPrism, addRoadBox } = Mapcast;
 const { buildWaterMask, WATER } = Mapcast;
 const { textPolygons } = Mapcast;
+const { quantizer, contourPoints } = Mapcast;
 
 const tick = () => new Promise(r => setTimeout(r, 16));
 
@@ -57,10 +58,26 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
     mask = buildWaterMask(osm, { bbox: bbox(ring), h, ll2m, scale, rawElevAt, minRiver: 1.2 });
   }
   // Lakes are flattened to their level; everything else follows the DEM.
-  const elevAt = !elev ? () => 0 : mask ? (x, y) => { const l = mask.levelAt(x, y); return l != null ? l : rawElevAt(x, y); } : rawElevAt;
+  const smoothElevAt = !elev ? () => 0 : mask ? (x, y) => { const l = mask.levelAt(x, y); return l != null ? l : rawElevAt(x, y); } : rawElevAt;
+  let elevAt = smoothElevAt, extraPts = mask ? mask.shorePts : [], steps = 0;
+
+  // Stepped terrain: round heights down to whole steps, with contour point pairs for crisp walls.
+  if (S.stepped && elev && h) {
+    onStatus('Cutting terrain steps…', P.terrain); await tick();
+    const [x0, y0, x1, y1] = bbox(ring);
+    let m0 = Infinity, m1 = -Infinity;
+    const sample = (x, y) => { const e = smoothElevAt(x, y); if (e < m0) m0 = e; if (e > m1) m1 = e; };
+    for (let j = 0; j <= 150; j++) for (let i = 0; i <= 150; i++) { const x = x0 + (x1 - x0) * i / 150, y = y0 + (y1 - y0) * j / 150; if (inRing(x, y, ring)) sample(x, y); }
+    ring.forEach(p => sample(p.x, p.y));
+    const stepM = S.stepMm / (scale * S.exag); // one step in metres of real elevation
+    const q = quantizer(m0, stepM);
+    extraPts = extraPts.concat(contourPoints(ring, h, smoothElevAt, m0, stepM));
+    elevAt = (x, y) => q(smoothElevAt(x, y));
+    steps = Math.floor((m1 - m0) / stepM) + 1;
+  }
 
   onStatus('Building terrain…', P.terrain); await tick();
-  const T = buildTerrain(ring, h, elevAt, mask ? mask.shorePts : []);
+  const T = buildTerrain(ring, h, elevAt, extraPts);
   const zOf = e => S.base + (e - T.minE) * scale * S.exag;
   const zAt = (x, y) => zOf(elevAt(x, y));
 
@@ -181,6 +198,7 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
     ['Footprint', `${(fx1 - fx0).toFixed(0)} × ${(fy1 - fy0).toFixed(0)} mm`], ['Height', `${maxZ.toFixed(1)} mm`],
     ['Scale', `1:${Number((1000 / scale).toPrecision(3)).toLocaleString()}`],
     ...(elev ? [['Elevation range', `${Math.round(T.minE)}–${Math.round(T.maxE)} m`]] : []),
+    ...(steps ? [['Steps', `${steps} × ${S.stepMm} mm`]] : []),
     ...(wantWater ? [['Water', `${(waterShare * 100).toFixed(waterShare < 0.1 ? 1 : 0)}% of area`]] : []),
     ...(S.route && S.route.length ? [['Route', `${routeKm.toFixed(1)} km`]] : []),
     ...(S.buildings ? [['Buildings', nB.toLocaleString()]] : []), ...(S.roads ? [['Roads', nR.toLocaleString()]] : []),

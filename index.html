@@ -77,6 +77,16 @@
           <div class="lab"><span>Terrain exaggeration</span><output id="oExag"></output></div>
           <input type="range" id="sExag" min="0.5" max="10" step="0.1" value="1.5">
         </div>
+        <div class="field" id="fSurface">
+          <div class="lab"><span>Terrain surface</span></div>
+          <div class="seg seg2" id="surface">
+            <button data-v="smooth" class="active">Smooth</button><button data-v="stepped">Stepped</button>
+          </div>
+        </div>
+        <div class="field hidden" id="fStep">
+          <div class="lab"><span>Step height</span><output id="oStep"></output></div>
+          <input type="range" id="sStep" min="0.3" max="5" step="0.1" value="1">
+        </div>
         <div class="field">
           <div class="lab"><span>Detail</span></div>
           <div class="seg" id="detail">
@@ -198,6 +208,7 @@
 <script src="js/stl.js"></script>
 <script src="js/water.js"></script>
 <script src="js/label.js"></script>
+<script src="js/steps.js"></script>
 <script src="js/model.js"></script>
 <script src="js/generator.js"></script>
 <script src="js/terrain3d.js"></script>

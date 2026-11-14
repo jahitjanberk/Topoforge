@@ -142,6 +142,15 @@ const SCENARIOS = {
     check('label and base (with plate) are closed', !!r.parts.label && partsOk(r.parts), JSON.stringify({ terrain: r.parts.terrain, label: r.parts.label }));
     await screenshot('label.png');
   },
+  async stepped() {
+    await setArea(46.6930, 7.7300, 12, { lTerrain: 1, lWater: 1 });
+    await evaluate(`document.querySelector('#surface button[data-v="stepped"]').click(), true`);
+    const r = await generate();
+    await evaluate(`document.querySelector('#surface button[data-v="smooth"]').click(), true`);
+    check('stepped terrain generates', !r.failed && !!r.parts.terrain, `${r.ms} ms · ${r.status}`);
+    check('stepped terrain + water are watertight', partsOk(r.parts), JSON.stringify(r.parts));
+    await screenshot('stepped.png');
+  },
   async cancel() {
     await setArea(46.5586, 7.8357, 11, { lTerrain: 1 });
     await evaluate(`document.querySelector('#detail button[data-v="0.4"]').click(), true`);
