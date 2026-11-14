@@ -38,9 +38,51 @@ function initThree() {
   three = { renderer, scene, camera, controls, group, resize, start: () => { if (!running) { running = true; loop(); } }, stop: () => { running = false; } };
 }
 
+/* ---------- pop-up (modal) ---------- */
+// States: 'loading' (progress while the model builds), 'error', 'ready' (3D preview + downloads).
+let returnFocus = null;
+const modal = () => $('#preview');
+function setState(state, title) {
+  modal().dataset.state = state;
+  $('#pvTitle').textContent = title;
+}
+function openModal() {
+  const m = modal();
+  if (m.classList.contains('hidden')) {
+    returnFocus = document.activeElement;
+    m.classList.remove('hidden');
+  }
+  setState('loading', 'Building your model…');
+  modalProgress('Starting…', 0);
+  $('#pvCancel').textContent = 'Cancel';
+  $('#pvClose').focus();
+}
+function modalProgress(msg, frac) {
+  $('#pvLoadMsg').textContent = msg;
+  if (typeof frac === 'number') $('#pvProgress').firstElementChild.style.width = `${Math.round(Math.max(0, Math.min(1, frac)) * 100)}%`;
+}
+function modalError(msg) {
+  setState('error', 'Couldn’t build the model');
+  $('#pvLoadMsg').textContent = msg;
+  $('#pvCancel').textContent = 'Close';
+  $('#pvCancel').focus();
+}
+// Keep keyboard focus inside the pop-up while it's open.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Tab' || !isPreviewOpen()) return;
+  const items = [...modal().querySelectorAll('button, [href], input, select, [tabindex]:not([tabindex="-1"])')].filter(el => !el.disabled && el.offsetParent !== null);
+  if (!items.length) return;
+  const first = items[0], last = items[items.length - 1];
+  if (!modal().contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+  else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+
 async function showPreview(model) {
   await loadThree();
-  $('#preview').classList.remove('hidden');
+  const wasHidden = modal().classList.contains('hidden');
+  if (wasHidden) { returnFocus = document.activeElement; modal().classList.remove('hidden'); }
+  setState('ready', 'Your model');
   if (!three) initThree();
   three.resize();
   const g = three.group;
@@ -57,6 +99,10 @@ async function showPreview(model) {
   three.camera.position.set(c.x - r * 0.15, c.y - r * 1.25, c.z + r * 0.95);
   three.camera.near = r / 100; three.camera.far = r * 20; three.camera.updateProjectionMatrix();
   three.start();
+  // Notes (size warnings, layers left out, connector instructions) — the sidebar is behind the backdrop.
+  const notesEl = $('#pvNotes');
+  notesEl.replaceChildren(...(model.notes || []).map(n => { const p = document.createElement('p'); p.textContent = n; return p; }));
+  notesEl.classList.toggle('hidden', !(model.notes || []).length);
   $('#pvStats').innerHTML = model.stats.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
   const parts = $('#dlParts'), mb = arrs => (arrs.reduce((s, a) => s + a.length, 0) / 9 * 50 / 1048576).toFixed(1);
   const partName = l => l.tile ? l.name.slice(l.tile.length + 3) : l.name; // "A1 · Water" → "Water"
@@ -90,7 +136,12 @@ async function showPreview(model) {
 }
 
 function isPreviewOpen() { return !$('#preview').classList.contains('hidden'); }
-function closePreview() { $('#preview').classList.add('hidden'); if (three) three.stop(); }
+function closePreview() {
+  $('#preview').classList.add('hidden');
+  if (three) three.stop();
+  if (returnFocus && document.contains(returnFocus)) returnFocus.focus();
+  returnFocus = null;
+}
 
-Object.assign(Mapcast, { showPreview, isPreviewOpen, closePreview });
+Object.assign(Mapcast, { showPreview, isPreviewOpen, closePreview, openModal, modalProgress, modalError });
 })();

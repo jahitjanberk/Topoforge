@@ -147,13 +147,35 @@ details.adv .inner{padding-top:10px}
 .mh:hover{transform-origin:center;filter:brightness(1.05)}
 
 /* ---------- preview ---------- */
-#preview{position:fixed;inset:0;z-index:5000;background:var(--bg);display:grid;grid-template-columns:1fr 340px}
+/* Model pop-up: darkened backdrop + card. Opens on Generate (showing progress), then the preview. */
+.modal{position:fixed;inset:0;z-index:5000;display:grid;place-items:center;padding:28px}
+.modal-backdrop{position:absolute;inset:0;background:rgba(17,17,20,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);animation:mc-fade .18s ease-out}
+.modal-card{position:relative;width:min(1240px,100%);height:min(820px,100%);background:var(--bg);border-radius:18px;overflow:hidden;
+  box-shadow:0 30px 80px rgba(0,0,0,.38),0 2px 8px rgba(0,0,0,.2);display:grid;grid-template-columns:1fr 340px;animation:mc-pop .24s cubic-bezier(.2,.9,.3,1.15)}
+@keyframes mc-fade{from{opacity:0}}
+@keyframes mc-pop{from{opacity:0;transform:translateY(10px) scale(.98)}}
+@media (prefers-reduced-motion:reduce){.modal-backdrop,.modal-card{animation:none}}
 #pvCanvas{position:relative;min-height:0;background:radial-gradient(circle at 50% 40%,#ffffff 0%,#ecebe8 70%)}
+/* Building / error panel over the canvas */
+.pv-loading{position:absolute;inset:0;z-index:2;display:grid;place-content:center;justify-items:center;gap:14px;padding:24px;text-align:center;background:radial-gradient(circle at 50% 40%,#ffffff 0%,#ecebe8 75%)}
+.pv-load-msg{margin:0;max-width:420px;font-size:14px;line-height:1.5;color:var(--ink2)}
+.pv-load-bar{width:min(320px,70vw);margin:0}
+.spin.big{width:34px;height:34px;border-width:3px;margin:0}
+.pv-load-btn{width:auto;padding:8px 18px;margin:0}
+#preview[data-state="ready"] .pv-loading{display:none}
+#preview[data-state="ready"] .pv-wait,#preview:not([data-state="ready"]) .pv-result{display:none}
+#preview:not([data-state="ready"]) .pv-hint{display:none}
+#preview[data-state="error"] .spin,#preview[data-state="error"] .pv-load-bar{display:none}
+#preview[data-state="error"] .pv-load-msg{color:var(--err)}
 #pvCanvas canvas{display:block;width:100%!important;height:100%!important}
 .pv-hint{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);font-size:12px;color:var(--muted);background:rgba(255,255,255,.8);padding:6px 12px;border-radius:999px}
 .pv-side{background:#fff;border-left:1px solid var(--line);padding:20px;overflow:auto;display:flex;flex-direction:column;gap:12px}
 .pv-head{display:flex;align-items:center;justify-content:space-between}
 .pv-head h2{margin:0;font-size:18px;letter-spacing:-.02em}
+.pv-result{display:flex;flex-direction:column;gap:12px}
+.pv-notes{display:flex;flex-direction:column;gap:6px}
+.pv-notes p{margin:0;font-size:12.5px;line-height:1.45;color:#7c2d12;background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;padding:8px 10px}
+.pv-wait{margin-top:4px}
 dl.stats{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0;font-size:12.5px;background:var(--bg);border-radius:10px;padding:12px}
 dl.stats dt{color:var(--muted)}
 dl.stats dd{margin:0;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px}
@@ -182,5 +204,7 @@ dl.stats dd{margin:0;text-align:right;font-family:'JetBrains Mono',monospace;fon
   #hint{font-size:11.5px;bottom:12px;max-width:calc(100% - 24px)}
   .maptools{top:62px}
   .basemap{left:50%;right:auto;transform:translateX(-50%)}
-  #preview{grid-template-columns:1fr;grid-template-rows:55vh 1fr}
+  .modal{padding:0}
+  .modal-card{width:100%;height:100%;border-radius:0;grid-template-columns:1fr;grid-template-rows:52% 1fr}
+  .pv-side{border-left:0;border-top:1px solid var(--line)}
 }

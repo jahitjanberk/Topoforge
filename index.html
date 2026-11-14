@@ -188,10 +188,23 @@
   </main>
 </div>
 
-<div id="preview" class="hidden">
-  <div id="pvCanvas"><div class="pv-hint">Drag to orbit · Scroll to zoom · Right-drag to pan</div></div>
+<div id="preview" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="pvTitle" data-state="loading">
+  <div class="modal-backdrop" id="pvBackdrop"></div>
+  <div class="modal-card">
+  <div id="pvCanvas">
+    <div class="pv-hint">Drag to orbit · Scroll to zoom · Right-drag to pan</div>
+    <!-- Shown while the model is being built (and for errors) -->
+    <div class="pv-loading" id="pvLoading" aria-live="polite">
+      <div class="spin big" aria-hidden="true"></div>
+      <p class="pv-load-msg" id="pvLoadMsg">Starting…</p>
+      <div class="progress pv-load-bar" id="pvProgress"><i></i></div>
+      <button class="ghost pv-load-btn" id="pvCancel">Cancel</button>
+    </div>
+  </div>
   <aside class="pv-side">
-    <div class="pv-head"><h2>Your model</h2><button class="iconbtn" id="pvClose" title="Close">✕</button></div>
+    <div class="pv-head"><h2 id="pvTitle">Your model</h2><button class="iconbtn" id="pvClose" title="Close (Esc)" aria-label="Close">✕</button></div>
+    <div class="pv-result" id="pvResult">
+    <div class="pv-notes" id="pvNotes"></div>
     <dl class="stats" id="pvStats"></dl>
     <button class="primary" id="dl3mf" title="One file with every part, named and coloured">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>
@@ -202,8 +215,11 @@
     <div class="sectionlabel" id="partsLabel">Separate parts (multi-colour)</div>
     <div class="parts" id="dlParts"></div>
     <p class="small">For multi-colour printing, import all part files together into your slicer as one object and assign a filament to each part.</p>
+    </div>
+    <p class="small pv-wait" id="pvWait">Your model will appear here when it’s ready. Downloads follow below it.</p>
     <button class="ghost" id="pvBack">← Back to map</button>
   </aside>
+  </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

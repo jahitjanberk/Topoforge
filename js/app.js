@@ -721,15 +721,21 @@ $('#generate').onclick = () => busy ? generator.cancel() : generate();
 async function generate() {
   if (!state.shape || busy) return;
   setBusy(true);
+  Mapcast.openModal(); // the pop-up shows progress, then the model
   try {
-    const result = await generator.run(shapeRing(state.shape, 256), readSettings(), (msg, frac) => setStatus(msg, 'busy', frac));
+    const result = await generator.run(shapeRing(state.shape, 256), readSettings(), (msg, frac) => { setStatus(msg, 'busy', frac); Mapcast.modalProgress(msg, frac); });
     lastModel = { ...result, name: slug(), title: modelTitle() };
     await showPreview(lastModel);
     setStatus(['Model ready.', ...result.notes].join(' '));
   } catch (err) {
-    if (err && err.cancelled) setStatus('Cancelled.');
-    else { console.error(err); setStatus(err.message || String(err), 'err'); }
+    if (err && err.cancelled) { setStatus('Cancelled.'); closePreview(); }
+    else { console.error(err); setStatus(err.message || String(err), 'err'); Mapcast.modalError(err.message || String(err)); }
   } finally { setBusy(false); }
+}
+// Closing the pop-up (✕, Esc, Back, the darkened background) while a model is building cancels it.
+function requestClosePreview() {
+  if (busy) { if (generator.cancellable) generator.cancel(); return; }
+  closePreview();
 }
 $('#dlAll').onclick = () => lastModel && download(toSTL(lastModel.layers.map(l => l.arr)), lastModel.name + '.stl');
 $('#dl3mf').onclick = async () => {
@@ -741,8 +747,8 @@ $('#dl3mf').onclick = async () => {
 };
 // Human-readable model name for 3MF objects: the place, else "Mapcast model".
 function modelTitle() { return state.place || ($('#tLabel').value.trim()) || 'Mapcast model'; }
-$('#pvClose').onclick = closePreview; $('#pvBack').onclick = closePreview;
-window.addEventListener('keydown', e => { if (e.key === 'Escape' && isPreviewOpen()) closePreview(); });
+for (const id of ['pvClose', 'pvBack', 'pvCancel', 'pvBackdrop']) $('#' + id).onclick = requestClosePreview;
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && isPreviewOpen()) { e.preventDefault(); requestClosePreview(); } });
 
 function slug() {
   const base = state.place || (state.shape ? (() => { const c = L.latLngBounds(shapeRing(state.shape, 16)).getCenter(); return `${c.lat.toFixed(4)}_${c.lng.toFixed(4)}`; })() : 'model');

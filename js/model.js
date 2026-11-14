@@ -412,7 +412,7 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
     ['Scale', `1:${Number((1000 / scale).toPrecision(3)).toLocaleString()}`],
     ...(elev ? [['Elevation range', `${Math.round(minE)}–${Math.round(maxE)} m`]] : []),
     ...(steps ? [['Steps', `${steps} × ${S.stepMm} mm`]] : []),
-    ...(wantWater ? [['Water', `${(waterShare * 100).toFixed(waterShare < 0.1 ? 1 : 0)}% of area`]] : []),
+    ...(wantWater && !osmError ? [['Water', `${(waterShare * 100).toFixed(waterShare < 0.1 ? 1 : 0)}% of area`]] : []),
     ...(S.route && S.route.length ? [['Route', `${routeKm.toFixed(1)} km`]] : []),
     ...(S.buildings ? [['Buildings', nB.toLocaleString()]] : []), ...(S.roads ? [['Roads', nR.toLocaleString()]] : []),
     ['Triangles', tris.toLocaleString()], ['File size', `${(tris * 50 / 1048576).toFixed(1)} MB`]

@@ -207,6 +207,37 @@ const SCENARIOS = {
       check(`${name}: ${r.uniform.tris.toLocaleString()} → ${r.adaptive.tris.toLocaleString()} triangles (${pct}%), ${r.uniform.mb} → ${r.adaptive.mb} MB STL`, r.adaptive.open === 0 && r.adaptive.nm === 0, `build ${r.uniform.ms} → ${r.adaptive.ms} ms`);
     }
   },
+  async modal() {
+    await setArea(46.6863, 7.8632, 14, { lTerrain: 1, lWater: 1 });
+    // Opens straight away, in the building state, over a darkened backdrop.
+    const during = await evaluate(`(async () => {
+      document.querySelector('#generate').focus();
+      const p = window.__mapcast.generate(); window.__gen = p;
+      await new Promise(r => setTimeout(r, 400));
+      const m = document.querySelector('#preview'), bd = getComputedStyle(document.querySelector('#pvBackdrop'));
+      return { open: !m.classList.contains('hidden'), state: m.dataset.state, title: document.querySelector('#pvTitle').textContent, msg: document.querySelector('#pvLoadMsg').textContent, backdrop: bd.backgroundColor, focusInside: m.contains(document.activeElement) };
+    })()`);
+    await screenshot('modal-loading.png');
+    check('Generate opens the pop-up at once, showing progress', during.open && during.state === 'loading' && /Build/.test(during.title) && during.msg.length > 3 && during.focusInside, JSON.stringify(during));
+    check('the page behind is darkened', /rgba\(17, 17, 20, 0\.6/.test(during.backdrop), during.backdrop);
+    const ready = await evaluate(`(async () => { await window.__gen; const m = document.querySelector('#preview');
+      return { state: m.dataset.state, title: document.querySelector('#pvTitle').textContent, resultShown: getComputedStyle(document.querySelector('#pvResult')).display !== 'none', loadingHidden: getComputedStyle(document.querySelector('#pvLoading')).display === 'none' }; })()`);
+    await sleep(800); await screenshot('modal-ready.png');
+    check('the pop-up switches to the model when ready', ready.state === 'ready' && ready.title === 'Your model' && ready.resultShown && ready.loadingHidden, JSON.stringify(ready));
+    // Esc closes it and gives focus back.
+    const esc = await evaluate(`(() => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      return { closed: document.querySelector('#preview').classList.contains('hidden'), focus: document.activeElement && document.activeElement.id }; })()`);
+    check('Esc closes the pop-up and returns focus', esc.closed && esc.focus === 'generate', JSON.stringify(esc));
+    // Clicking the backdrop while building cancels the build.
+    const cancel = await evaluate(`(async () => {
+      document.querySelector('#detail button[data-v="0.4"]').click();
+      const p = window.__mapcast.generate(); await new Promise(r => setTimeout(r, 300));
+      document.querySelector('#pvBackdrop').click(); await p;
+      document.querySelector('#detail button[data-v="0.7"]').click();
+      return { closed: document.querySelector('#preview').classList.contains('hidden'), status: document.querySelector('#status').textContent };
+    })()`);
+    check('clicking the darkened background while building cancels', cancel.closed && cancel.status === 'Cancelled.', JSON.stringify(cancel));
+  },
   async cancel() {
     await setArea(46.5586, 7.8357, 11, { lTerrain: 1 });
     await evaluate(`document.querySelector('#detail button[data-v="0.4"]').click(), true`);
