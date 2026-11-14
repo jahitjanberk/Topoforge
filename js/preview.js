@@ -49,7 +49,8 @@ async function showPreview(model) {
   for (const l of model.layers) {
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(l.arr, 3)); geo.computeVertexNormals();
     const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: l.color, roughness: .85, metalness: 0, flatShading: true }));
-    g.add(mesh); geo.computeBoundingBox(); box.union(geo.boundingBox);
+    if (l.offset) mesh.position.set(l.offset[0], l.offset[1], 0); // tiles are spread apart for the preview only
+    g.add(mesh); mesh.updateMatrixWorld(true); box.expandByObject(mesh);
   }
   const size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3()), r = Math.max(size.x, size.y, size.z);
   three.controls.target.copy(c);
@@ -57,12 +58,31 @@ async function showPreview(model) {
   three.camera.near = r / 100; three.camera.far = r * 20; three.camera.updateProjectionMatrix();
   three.start();
   $('#pvStats').innerHTML = model.stats.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
-  const parts = $('#dlParts');
-  parts.innerHTML = model.layers.map((l, i) => `<button data-i="${i}"><i style="background:${l.color}"></i>${l.name}<small>${(l.arr.length / 9 * 50 / 1048576).toFixed(1)} MB</small></button>`).join('');
-  $$('#dlParts button').forEach(b => b.onclick = () => { const l = model.layers[+b.dataset.i]; download(toSTL([l.arr]), `${model.name}-${l.id}.stl`); });
+  const parts = $('#dlParts'), mb = arrs => (arrs.reduce((s, a) => s + a.length, 0) / 9 * 50 / 1048576).toFixed(1);
+  const partName = l => l.tile ? l.name.slice(l.tile.length + 3) : l.name; // "A1 · Water" → "Water"
+  if (model.tiles) {
+    // One row per tile: the tile button downloads all its parts in one file; chips download single parts.
+    parts.innerHTML = model.tiles.map(t => {
+      const ls = model.layers.map((l, i) => ({ l, i })).filter(x => x.l.tile === t.name);
+      const chips = ls.length > 1 ? `<div class="tile-parts">${ls.map(({ l, i }) => `<button data-i="${i}" title="Download ${l.name}"><i style="background:${l.color}"></i>${partName(l)}</button>`).join('')}</div>` : '';
+      return `<div class="tile-row"><button data-tile="${t.name}"><b>${t.name === 'Label' ? 'Label plate' : 'Tile ' + t.name}</b><small>${mb(ls.map(x => x.l.arr))} MB</small></button>${chips}</div>`;
+    }).join('');
+    $$('#dlParts [data-tile]').forEach(b => b.onclick = () => {
+      const ls = model.layers.filter(l => l.tile === b.dataset.tile);
+      download(toSTL(ls.map(l => l.arr)), `${model.name}-${b.dataset.tile.toLowerCase()}.stl`);
+    });
+  } else {
+    parts.innerHTML = model.layers.map((l, i) => `<button data-i="${i}"><i style="background:${l.color}"></i>${l.name}<small>${mb([l.arr])} MB</small></button>`).join('');
+  }
+  $$('#dlParts [data-i]').forEach(b => b.onclick = () => { const l = model.layers[+b.dataset.i]; download(toSTL([l.arr]), `${model.name}-${l.id}.stl`); });
   const multi = model.layers.length > 1;
   parts.classList.toggle('hidden', !multi); $('#partsLabel').classList.toggle('hidden', !multi);
-  $('#partsLabel').nextElementSibling.nextElementSibling.classList.toggle('hidden', !multi);
+  $('#partsLabel').textContent = model.tiles ? 'Tiles (print each separately)' : 'Separate parts (multi-colour)';
+  const hint = $('#partsLabel').nextElementSibling.nextElementSibling;
+  hint.classList.toggle('hidden', !multi);
+  hint.textContent = model.tiles
+    ? 'Each tile file holds all of that tile’s parts. For multi-colour, load a tile’s part files together in your slicer. “Download STL” above gives the whole model, assembled.'
+    : 'For multi-colour printing, import all part files together into your slicer as one object and assign a filament to each part.';
 }
 
 function isPreviewOpen() { return !$('#preview').classList.contains('hidden'); }

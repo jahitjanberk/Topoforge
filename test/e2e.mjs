@@ -87,8 +87,9 @@ const generate = () => evaluate(`(async () => {
 const results = [];
 const check = (name, ok, detail = '') => { results.push({ name, ok }); console.log(`${ok ? '✔' : '✖'} ${name}${detail ? '  ' + detail : ''}`); };
 const watertight = (p, allowShared) => p && p.openEdges === 0 && (allowShared || p.nonManifoldEdges === 0) && p.degenerate === 0 && p.volume > 0;
+// Part ids are "roads" untiled and "a1-roads" when tiled.
 const partsOk = (parts, shared = ['buildings', 'roads', 'route', 'label']) =>
-  Object.entries(parts).every(([id, p]) => watertight(p, shared.includes(id)));
+  Object.entries(parts).every(([id, p]) => watertight(p, shared.some(s => id === s || id.endsWith('-' + s))));
 
 const SCENARIOS = {
   async boot() {
@@ -150,6 +151,18 @@ const SCENARIOS = {
     check('stepped terrain generates', !r.failed && !!r.parts.terrain, `${r.ms} ms · ${r.status}`);
     check('stepped terrain + water are watertight', partsOk(r.parts), JSON.stringify(r.parts));
     await screenshot('stepped.png');
+  },
+  async tiles() {
+    await setArea(46.6930, 7.7300, 12, { lTerrain: 1, lWater: 1 });
+    await evaluate(`(() => { for (const [id, v] of [['selTX', '2'], ['selTY', '2']]) { const s = document.getElementById(id); s.value = v; s.dispatchEvent(new Event('change')); }
+      const t = document.querySelector('#tLabel'); t.value = 'Thunersee'; t.dispatchEvent(new Event('change')); return true; })()`);
+    const r = await generate();
+    const ui = await evaluate(`({ rows: document.querySelectorAll('#dlParts .tile-row').length, label: document.querySelector('#partsLabel').textContent, tiles: (window.__mapcast.lastModel.tiles || []).map(t => t.name) })`);
+    await evaluate(`(() => { for (const id of ['selTX', 'selTY']) { const s = document.getElementById(id); s.value = '1'; s.dispatchEvent(new Event('change')); }
+      const t = document.querySelector('#tLabel'); t.value = ''; t.dispatchEvent(new Event('change')); return true; })()`);
+    check('2 × 2 tiles (+ label plate) generate', !r.failed && ui.tiles.join() === 'A1,B1,A2,B2,Label', `${r.ms} ms · ${JSON.stringify(ui)}`);
+    check('every tile part is watertight', partsOk(r.parts), `${Object.keys(r.parts).length} parts`);
+    await screenshot('tiles.png');
   },
   async cancel() {
     await setArea(46.5586, 7.8357, 11, { lTerrain: 1 });

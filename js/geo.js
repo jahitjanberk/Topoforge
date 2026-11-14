@@ -68,11 +68,36 @@ function simplifyDP(pts, tol) {
   return pts.filter((_, i) => keep[i]);
 }
 
+// Sutherland–Hodgman: clips a polygon to an axis-aligned rectangle [x0, y0, x1, y1]. Exact for
+// convex polygons; a concave one that leaves and re-enters may get zero-width bridges along the
+// rectangle edge (callers check with hasCrossings where that matters).
+function clipPolygonRect(poly, [x0, y0, x1, y1]) {
+  const edges = [
+    [p => p.x >= x0, (a, b) => ({ x: x0, y: a.y + (b.y - a.y) * (x0 - a.x) / (b.x - a.x) })],
+    [p => p.x <= x1, (a, b) => ({ x: x1, y: a.y + (b.y - a.y) * (x1 - a.x) / (b.x - a.x) })],
+    [p => p.y >= y0, (a, b) => ({ x: a.x + (b.x - a.x) * (y0 - a.y) / (b.y - a.y), y: y0 })],
+    [p => p.y <= y1, (a, b) => ({ x: a.x + (b.x - a.x) * (y1 - a.y) / (b.y - a.y), y: y1 })]
+  ];
+  let out = poly;
+  for (const [inside, cut] of edges) {
+    const src = out; out = [];
+    if (!src.length) break;
+    for (let i = 0; i < src.length; i++) {
+      const a = src[(i + src.length - 1) % src.length], b = src[i], ia = inside(a), ib = inside(b);
+      if (ib) { if (!ia) out.push(cut(a, b)); out.push(b); }
+      else if (ia) out.push(cut(a, b));
+    }
+  }
+  return out;
+}
+const rectContains = ([x0, y0, x1, y1], pts) => pts.every(p => p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1);
+const rectsOverlap = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+
 // Fractional slippy-map tile coordinates
 function tileXY(lat, lng, z) {
   const n = 2 ** z, lr = Math.max(-85.05, Math.min(85.05, lat)) * D2R;
   return { x: (lng + 180) / 360 * n, y: (1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2 * n };
 }
 
-Object.assign(Mapcast, { R, Bounds, toLocal, fromLocal, rot, fmtLen, fmtArea, signedArea, inRing, distToRing, bbox, cleanRing, simplifyDP, tileXY, D2R });
+Object.assign(Mapcast, { R, Bounds, toLocal, fromLocal, rot, fmtLen, fmtArea, signedArea, inRing, distToRing, bbox, cleanRing, simplifyDP, clipPolygonRect, rectContains, rectsOverlap, tileXY, D2R });
 })();

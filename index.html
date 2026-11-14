@@ -70,6 +70,15 @@
           <input type="range" id="sSize" min="40" max="300" step="5" value="150">
         </div>
         <div class="field">
+          <div class="lab"><span>Split into tiles</span><output id="oTiles"></output></div>
+          <div class="tilesel">
+            <select id="selTX" aria-label="Tile columns"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select>
+            <span>×</span>
+            <select id="selTY" aria-label="Tile rows"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select>
+            <span class="tilehint">columns × rows, for prints bigger than your bed</span>
+          </div>
+        </div>
+        <div class="field">
           <div class="lab"><span>Base thickness</span><output id="oBase"></output></div>
           <input type="range" id="sBase" min="1" max="10" step="0.5" value="3">
         </div>

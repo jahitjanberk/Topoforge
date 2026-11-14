@@ -555,7 +555,9 @@ function updateAreaPanel() {
   const m = shapeMetrics(s), S = readSettings();
   const k = S.size / Math.max(m.w, m.h);
   const ratio = 1000 / k, r3 = Number(ratio.toPrecision(3));
-  $('#aMeta').innerHTML = `${s.type === 'poly' ? `<b>${dimsText(s)}</b> · ${s.pts.length} points<br>` : ''}Area <b>${fmtArea(m.area)}</b><br>Model <b>${Math.round(m.w * k)} × ${Math.round(m.h * k)} mm</b> · scale 1:${r3.toLocaleString()}`;
+  const tiled = S.tilesX * S.tilesY > 1;
+  $('#oTiles').textContent = tiled ? `${Math.round(m.w * k / S.tilesX)} × ${Math.round(m.h * k / S.tilesY)} mm each` : 'Off';
+  $('#aMeta').innerHTML = `${s.type === 'poly' ? `<b>${dimsText(s)}</b> · ${s.pts.length} points<br>` : ''}Area <b>${fmtArea(m.area)}</b><br>Model <b>${Math.round(m.w * k)} × ${Math.round(m.h * k)} mm</b> · scale 1:${r3.toLocaleString()}${tiled ? `<br>${S.tilesX * S.tilesY} tiles of up to <b>${Math.round(m.w * k / S.tilesX)} × ${Math.round(m.h * k / S.tilesY)} mm</b>` : ''}`;
   const km2 = m.area / 1e6;
   let warn = '';
   if (S.buildings && km2 > 25) warn = `Large area for buildings (${km2.toFixed(0)} km²). Downloading may be slow or time out, and buildings will be tiny at this scale — consider terrain only.`;
@@ -618,6 +620,7 @@ const setSurface = v => { $$('#surface button').forEach(x => x.classList.toggle(
 $$('#surface button').forEach(b => b.onclick = () => { setSurface(b.dataset.v); save(); });
 ['lTerrain', 'lWater', 'lBuildings', 'lRoads', 'lPaths', 'lRoute', 'cSea'].forEach(id => $('#' + id).addEventListener('change', () => { syncLayerUi(); updateAreaPanel(); save(); }));
 $('#tLabel').addEventListener('change', save);
+['selTX', 'selTY'].forEach(id => $('#' + id).addEventListener('change', () => { updateAreaPanel(); save(); }));
 $('#labelPlace').onclick = () => {
   const c = state.shape ? L.latLngBounds(shapeRing(state.shape, 16)).getCenter() : map.getCenter();
   $('#tLabel').value = state.place || `${c.lat.toFixed(4)}°, ${c.lng.toFixed(4)}°`;
@@ -648,7 +651,8 @@ function readSettings() {
     water: $('#lTerrain').checked && $('#lWater').checked, waterDepth: +$('#sWD').value,
     route: state.route && $('#lRoute').checked ? state.route.segs : null, routeW: +$('#sRtW').value, routeH: +$('#sRtH').value,
     label: $('#tLabel').value.trim(), labelH: +$('#sLblH').value,
-    stepped: $('#lTerrain').checked && ($('#surface button.active') || {}).dataset?.v === 'stepped', stepMm: +$('#sStep').value
+    stepped: $('#lTerrain').checked && ($('#surface button.active') || {}).dataset?.v === 'stepped', stepMm: +$('#sStep').value,
+    tilesX: +$('#selTX').value || 1, tilesY: +$('#selTY').value || 1
   };
 }
 
@@ -656,7 +660,7 @@ function readSettings() {
 function save() {
   try {
     const s = state.shape, ser = s ? { ...s, c: s.c ? [s.c.lat, s.c.lng] : undefined, pts: s.pts ? s.pts.map(p => [p.lat, p.lng]) : undefined } : null;
-    const settings = {}; $$('#panel input').forEach(i => { if (i.id && i.id !== 'q' && i.type !== 'file' && !i.id.startsWith('i')) settings[i.id] = i.type === 'checkbox' ? i.checked : i.value; });
+    const settings = {}; $$('#panel input, #panel select').forEach(i => { if (i.id && i.id !== 'q' && i.type !== 'file' && !i.id.startsWith('i')) settings[i.id] = i.type === 'checkbox' ? i.checked : i.value; });
     settings.detail = ($('#detail button.active') || {}).dataset?.v;
     settings.surface = ($('#surface button.active') || {}).dataset?.v;
     localStorage.setItem(STORE, JSON.stringify({ shape: ser, settings, view: [map.getCenter().lat, map.getCenter().lng, map.getZoom()], place: state.place, relief: state.relief, view3d: state.view3d }));

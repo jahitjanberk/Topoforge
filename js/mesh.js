@@ -3,7 +3,7 @@
 'use strict';
 const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
 
-const { bbox, inRing, distToRing, signedArea } = Mapcast;
+const { bbox, inRing, distToRing, signedArea, cleanRing, clipPolygonRect, rectContains } = Mapcast;
 
 const earcut = (globalThis.earcut && globalThis.earcut.default) || globalThis.earcut;
 
@@ -238,21 +238,34 @@ function addPrism(o, outer, holes, zb, zt) {
   }
   return true;
 }
-function addRoadBox(o, a, b, w, zAt, roadH) {
-  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy); if (len < 1e-6) return;
-  const nx = -dy / len * w / 2, ny = dx / len * w / 2;
-  const q = [{ x: a.x - nx, y: a.y - ny }, { x: b.x - nx, y: b.y - ny }, { x: b.x + nx, y: b.y + ny }, { x: a.x + nx, y: a.y + ny }];
-  const zg = q.map(p => zAt(p.x, p.y)), zt = zg.map(z => z + roadH), zb = Math.max(0.05, Math.min(...zg) - 0.5);
-  pushTri(o, q[0].x, q[0].y, zt[0], q[1].x, q[1].y, zt[1], q[2].x, q[2].y, zt[2]);
-  pushTri(o, q[0].x, q[0].y, zt[0], q[2].x, q[2].y, zt[2], q[3].x, q[3].y, zt[3]);
-  pushTri(o, q[0].x, q[0].y, zb, q[2].x, q[2].y, zb, q[1].x, q[1].y, zb);
-  pushTri(o, q[0].x, q[0].y, zb, q[3].x, q[3].y, zb, q[2].x, q[2].y, zb);
-  for (let i = 0; i < 4; i++) {
-    const j = (i + 1) % 4, A = q[i], Bq = q[j];
+// Solid over a convex, counter-clockwise outline: flat bottom at zb, top following zTop(p).
+function addDrapedPrism(o, q, zTop, zb) {
+  const zt = q.map(zTop), n = q.length;
+  for (let i = 1; i < n - 1; i++) {
+    pushTri(o, q[0].x, q[0].y, zt[0], q[i].x, q[i].y, zt[i], q[i + 1].x, q[i + 1].y, zt[i + 1]);   // top (fan)
+    pushTri(o, q[0].x, q[0].y, zb, q[i + 1].x, q[i + 1].y, zb, q[i].x, q[i].y, zb);              // bottom
+  }
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n, A = q[i], Bq = q[j];
     pushTri(o, A.x, A.y, zb, Bq.x, Bq.y, zb, Bq.x, Bq.y, zt[j]);
     pushTri(o, A.x, A.y, zb, Bq.x, Bq.y, zt[j], A.x, A.y, zt[i]);
   }
 }
 
-Object.assign(Mapcast, { earcutWinding, pushTri, buildTerrain, terrainSolid, refineWater, splitWater, addPrism, addRoadBox });
+// A road/route piece from a to b, w wide, roadH above the terrain. clipRect (optional): keep only
+// the part inside this rectangle (tiles) — the piece stays convex, so it stays a closed solid.
+function addRoadBox(o, a, b, w, zAt, roadH, clipRect = null) {
+  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy); if (len < 1e-6) return false;
+  const nx = -dy / len * w / 2, ny = dx / len * w / 2;
+  let q = [{ x: a.x - nx, y: a.y - ny }, { x: b.x - nx, y: b.y - ny }, { x: b.x + nx, y: b.y + ny }, { x: a.x + nx, y: a.y + ny }];
+  const zb = Math.max(0.05, Math.min(...q.map(p => zAt(p.x, p.y))) - 0.5);
+  if (clipRect && !rectContains(clipRect, q)) {
+    q = cleanRing(clipPolygonRect(q, clipRect), 1e-5);
+    if (q.length < 3 || Math.abs(signedArea(q)) < 1e-4) return false;
+  }
+  addDrapedPrism(o, q, p => zAt(p.x, p.y) + roadH, zb);
+  return true;
+}
+
+Object.assign(Mapcast, { earcutWinding, pushTri, buildTerrain, terrainSolid, refineWater, splitWater, addPrism, addDrapedPrism, addRoadBox });
 })();
