@@ -138,8 +138,31 @@ function buildTerrain(ring, h, elevAt, extraPts = [], opts = {}) {
   for (let i = 0; i < N; i++) { E[i] = elevAt(P[i].x, P[i].y); if (E[i] < minE) minE = E[i]; if (E[i] > maxE) maxE = E[i]; }
   return { P, keep, E, minE, maxE, N };
 }
+// Triangulates a flat polygon (outline + holes, as point arrays) at height z, facing up or down.
+// Returns the covered area (to verify earcut didn't drop any of it).
+function flatFace(out, outer, holes, z, up) {
+  const pts = outer.concat(...holes), flat = [], hi = [];
+  outer.forEach(p => flat.push(p.x, p.y));
+  for (const h of holes) { hi.push(flat.length / 2); h.forEach(p => flat.push(p.x, p.y)); }
+  const tr = earcut(flat, hi.length ? hi : null);
+  const flip = (earcutWinding(tr, i => pts[i]) > 0) === !up;
+  let covered = 0;
+  for (let i = 0; i < tr.length; i += 3) {
+    let a = pts[tr[i]], b = pts[tr[i + 1]], c = pts[tr[i + 2]];
+    covered += Math.abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) / 2;
+    if (flip) { const t = b; b = c; c = t; }
+    pushTri(out, a.x, a.y, z, b.x, b.y, z, c.x, c.y, z);
+  }
+  return covered;
+}
+
 // zs: optional per-vertex top heights overriding zOf(E[i]) (used to recess water areas).
-function terrainSolid(T, zOf, zs = null) {
+// pockets: optional connector pockets cut up into the underside at the outline:
+//   [{ S, T: {x, y} (boundary vertices on the outline), inner: [{x, y}…] (path S→T inside), d }]
+//   The bottom follows S → inner → T instead of the outline between S and T, and the cavity gets
+//   walls up to height d and a ceiling at d. Returns null if a pocket can't be placed (S/T not on
+//   the outline, or the bottom can't be triangulated) — the caller then builds without pockets.
+function terrainSolid(T, zOf, zs = null, pockets = []) {
   const { P, keep, E, N } = T, out = [];
   const Z = zs || new Float64Array(N); if (!zs) for (let i = 0; i < N; i++) Z[i] = zOf(E[i]);
   for (let i = 0; i < keep.length; i += 3) { const a = keep[i], b = keep[i + 1], c = keep[i + 2]; pushTri(out, P[a].x, P[a].y, Z[a], P[b].x, P[b].y, Z[b], P[c].x, P[c].y, Z[c]); }
@@ -150,12 +173,61 @@ function terrainSolid(T, zOf, zs = null) {
   for (let i = 0; i < keep.length; i += 3) for (let j = 0; j < 3; j++) {
     const u = keep[i + j], v = keep[i + (j + 1) % 3];
     if (cnt.get(key(u, v)) !== 1) continue;
-    const a = P[u], b = P[v];
-    pushTri(out, a.x, a.y, 0, b.x, b.y, 0, b.x, b.y, Z[v]);
-    pushTri(out, a.x, a.y, 0, b.x, b.y, Z[v], a.x, a.y, Z[u]);
     if (next.has(u)) pinch = true; next.set(u, v);
   }
-  // bottom: earcut the boundary loops; fall back to mirroring the top
+
+  // Pockets → which outline edges get a raised bottom (z = d) and where walls need an extra vertex.
+  const raised = new Map(), splitEnd = new Map(), splitStart = new Map(), runs = [];
+  if (pockets.length) {
+    if (pinch) return null;
+    const bIdx = new Map(); for (const u of next.keys()) bIdx.set(P[u].x + ',' + P[u].y, u);
+    for (const pk of pockets) {
+      let s = bIdx.get(pk.S.x + ',' + pk.S.y), t = bIdx.get(pk.T.x + ',' + pk.T.y), inner = pk.inner;
+      if (s === undefined || t === undefined) return null;
+      const walk = (a, b) => { const run = [a]; let u = a; for (let g = 0; g < 200 && u !== b; g++) { u = next.get(u); if (u === undefined) return null; run.push(u); } return u === b ? run : null; };
+      let run = walk(s, t);
+      if (!run) { run = walk(t, s); inner = inner.slice().reverse(); [s, t] = [t, s]; }
+      if (!run || run.some((u, i) => i > 0 && i < run.length - 1 && raised.has(u))) return null;
+      for (let i = 0; i + 1 < run.length; i++) raised.set(run[i], pk.d); // edge run[i] → run[i+1]
+      const prev = [...next.entries()].find(([, v]) => v === s)[0];
+      splitEnd.set(prev, pk.d);   // the outline edge entering S gets a vertex at (S, d)
+      splitStart.set(t, pk.d);    // the outline edge leaving T gets a vertex at (T, d)
+      runs.push({ run, inner, d: pk.d });
+    }
+  }
+
+  // Side walls along the outline.
+  for (const [u, v] of next) {
+    const a = P[u], b = P[v], zb = raised.has(u) ? raised.get(u) : 0;
+    if (splitEnd.has(u) && !raised.has(u)) {          // ends at a pocket mouth: vertex (b, d)
+      const d = splitEnd.get(u);
+      pushTri(out, a.x, a.y, 0, b.x, b.y, 0, b.x, b.y, d);
+      pushTri(out, a.x, a.y, 0, b.x, b.y, d, b.x, b.y, Z[v]);
+      pushTri(out, a.x, a.y, 0, b.x, b.y, Z[v], a.x, a.y, Z[u]);
+    } else if (splitStart.has(u) && !raised.has(u)) { // starts at a pocket mouth: vertex (a, d)
+      const d = splitStart.get(u);
+      pushTri(out, a.x, a.y, 0, b.x, b.y, 0, b.x, b.y, Z[v]);
+      pushTri(out, a.x, a.y, 0, b.x, b.y, Z[v], a.x, a.y, d);
+      pushTri(out, a.x, a.y, d, b.x, b.y, Z[v], a.x, a.y, Z[u]);
+    } else {
+      pushTri(out, a.x, a.y, zb, b.x, b.y, zb, b.x, b.y, Z[v]);
+      pushTri(out, a.x, a.y, zb, b.x, b.y, Z[v], a.x, a.y, Z[u]);
+    }
+  }
+
+  // Pockets: walls along S → inner → T (from 0 to d) and a ceiling at d.
+  for (const { run, inner, d } of runs) {
+    const path = [P[run[0]], ...inner, P[run[run.length - 1]]];
+    for (let i = 0; i + 1 < path.length; i++) {
+      const a = path[i], b = path[i + 1];
+      pushTri(out, a.x, a.y, 0, b.x, b.y, 0, b.x, b.y, d);
+      pushTri(out, a.x, a.y, 0, b.x, b.y, d, a.x, a.y, d);
+    }
+    flatFace(out, run.map(u => P[u]).concat(inner.slice().reverse()), [], d, false);
+  }
+
+  // Bottom: the outline loops (with pocket detours) triangulated at z = 0; fall back to mirroring
+  // the top when the loops can't be used.
   let bottomOk = false;
   if (!pinch) {
     const loops = [], seen = new Set();
@@ -165,31 +237,37 @@ function terrainSolid(T, zOf, zs = null) {
       while (!seen.has(u) && guard++ < 1e7) { seen.add(u); loop.push(u); u = next.get(u); if (u === undefined) break; }
       if (u === s && loop.length >= 3) loops.push(loop);
     }
-    const area = l => signedArea(l.map(i => P[i]));
-    const outers = loops.filter(l => area(l) > 0).map(l => ({ l, holes: [], a: area(l) })), holes = loops.filter(l => area(l) < 0);
+    // Replace each pocket's outline run (between S and T) with its inner path. A loop must not
+    // start strictly inside a run, or part of the run would be emitted before the detour.
+    const detour = new Map(runs.map(r => [r.run[0], r]));
+    const interior = new Set(runs.flatMap(r => r.run.slice(1, -1)));
+    const toPts = loopIn => {
+      const k = loopIn.findIndex(u => !interior.has(u)), loop = loopIn.slice(k).concat(loopIn.slice(0, k));
+      const pts = [];
+      for (let i = 0; i < loop.length; i++) {
+        const u = loop[i], r = detour.get(u);
+        pts.push(P[u]);
+        if (r) { pts.push(...r.inner); while (loop[(i + 1) % loop.length] !== r.run[r.run.length - 1]) i++; }
+      }
+      return pts;
+    };
+    const ptLoops = loops.map(toPts);
+    const outers = ptLoops.filter(l => signedArea(l) > 0).map(l => ({ l, holes: [], a: signedArea(l) })), holes = ptLoops.filter(l => signedArea(l) < 0);
     for (const hl of holes) {
-      const p = P[hl[0]];
-      const cands = outers.filter(o => inRing(p.x, p.y, o.l.map(i => P[i]))).sort((x, y) => x.a - y.a);
+      const cands = outers.filter(o => inRing(hl[0].x, hl[0].y, o.l)).sort((x, y) => x.a - y.a);
       if (cands[0]) cands[0].holes.push(hl);
     }
     const bot = []; let covered = 0, expected = 0;
     for (const o of outers) {
-      const idx = [...o.l], hi = [];
-      for (const hl of o.holes) { hi.push(idx.length); idx.push(...hl); }
-      const flat = []; idx.forEach(i => flat.push(P[i].x, P[i].y));
-      const tr = earcut(flat, hi.length ? hi : null);
-      expected += o.a + o.holes.reduce((s, hl) => s + area(hl), 0);
-      const flip = earcutWinding(tr, i => P[idx[i]]) > 0; // bottom faces must point down
-      for (let i = 0; i < tr.length; i += 3) {
-        let a = P[idx[tr[i]]], b = P[idx[tr[i + 1]]], c = P[idx[tr[i + 2]]];
-        covered += Math.abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) / 2;
-        if (flip) { const tmp = b; b = c; c = tmp; }
-        pushTri(bot, a.x, a.y, 0, b.x, b.y, 0, c.x, c.y, 0);
-      }
+      expected += o.a + o.holes.reduce((s, hl) => s + signedArea(hl), 0);
+      covered += flatFace(bot, o.l, o.holes, 0, false);
     }
     if (expected > 0 && Math.abs(covered - expected) / expected < 0.005) { for (const v of bot) out.push(v); bottomOk = true; }
   }
-  if (!bottomOk) for (let i = 0; i < keep.length; i += 3) { const a = P[keep[i]], b = P[keep[i + 1]], c = P[keep[i + 2]]; pushTri(out, a.x, a.y, 0, c.x, c.y, 0, b.x, b.y, 0); }
+  if (!bottomOk) {
+    if (runs.length) return null; // pockets need the outline bottom
+    for (let i = 0; i < keep.length; i += 3) { const a = P[keep[i]], b = P[keep[i + 1]], c = P[keep[i + 2]]; pushTri(out, a.x, a.y, 0, c.x, c.y, 0, b.x, b.y, 0); }
+  }
   return out;
 }
 // A vertex is recessed under water only when all its triangles are water, so shore vertices keep

@@ -25,7 +25,8 @@ const lerp = ([a, b], f) => a + (b - a) * f;
 
 const PARTS = [
   ['terrain', 'Terrain & base', '#e3d3b0'], ['water', 'Water', '#4a90d9'], ['buildings', 'Buildings', '#fbfaf8'],
-  ['roads', 'Roads', '#52525b'], ['route', 'Route', '#e11d48'], ['label', 'Label', '#27272a']
+  ['roads', 'Roads', '#52525b'], ['route', 'Route', '#e11d48'], ['label', 'Label', '#27272a'],
+  ['keys', 'Connector keys', '#a8a29e']
 ];
 const TILE_GAP = 6; // mm between tiles in the preview (downloads keep the real positions)
 
@@ -106,10 +107,67 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
     if (signedArea(tRing) < 0) tRing = tRing.slice().reverse();
     if (tiled && hasCrossings([tRing])) notes.push(`Tile ${String.fromCharCode(65 + i)}${j + 1}: the area's outline crosses this tile's edge several times, so its edge may be uneven.`);
     tiles.push({
-      name: String.fromCharCode(65 + i) + (j + 1), rect: tiled ? rect : [-Infinity, -Infinity, Infinity, Infinity], ring: tRing,
+      name: String.fromCharCode(65 + i) + (j + 1), i, j, rect: tiled ? rect : [-Infinity, -Infinity, Infinity, Infinity], ring: tRing,
       offset: tiled ? [(i - (nx - 1) / 2) * TILE_GAP, ((ny - 1) / 2 - j) * TILE_GAP] : [0, 0],
       parts: Object.fromEntries(PARTS.map(([id]) => [id, []]))
     });
+  }
+
+  /* ---------- connector keys (tiles only) ---------- */
+  // Bowtie keys join neighbouring tiles: each tile gets a half-dovetail pocket cut up into its
+  // underside at the seam (wider inside than at the seam, so a key can't pull out sideways), and
+  // the keys are printed separately and pushed in from below. Pocket mouths are inserted into the
+  // tile outlines now, so they become mesh vertices; keys are confirmed once heights are known.
+  let keys = [];
+  const pocketD = Math.min(2.5, Math.max(0.8, S.base * 0.5)); // pocket depth = key thickness + 0.2
+  if (tiled && h && S.connectors !== false) {
+    const tw = Math.min((rx1 - rx0) / nx, (ry1 - ry0) / ny);
+    const a = Math.min(8, Math.max(4, tw * 0.1)), w0 = a * 0.85, w1 = a * 1.45; // depth, mouth, inner width
+    const at = (i, j) => tiles.find(t => t.i === i && t.j === j);
+    const onLine = (ringT, coord, val) => ringT.filter(p => Math.abs(p[coord] - val) < 1e-9).map(p => p[coord === 'x' ? 'y' : 'x']);
+    const seams = [];
+    for (const A of tiles) {
+      const E = at(A.i + 1, A.j), Sb = at(A.i, A.j + 1); // east and south neighbours
+      if (E) seams.push({ A, B: E, coord: 'x', val: A.rect[2], u: { x: 0, y: 1 }, nA: { x: -1, y: 0 } });
+      if (Sb) seams.push({ A, B: Sb, coord: 'y', val: A.rect[1], u: { x: 1, y: 0 }, nA: { x: 0, y: 1 } });
+    }
+    for (const sm of seams) {
+      const ea = onLine(sm.A.ring, sm.coord, sm.val), eb = onLine(sm.B.ring, sm.coord, sm.val);
+      if (ea.length < 2 || eb.length < 2) continue;
+      const lo = Math.max(Math.min(...ea), Math.min(...eb)) + w1 / 2 + 1, hi = Math.min(Math.max(...ea), Math.max(...eb)) - w1 / 2 - 1;
+      if (hi <= lo) continue;
+      const count = Math.max(1, Math.round((hi - lo) / 50)), spacing = count === 1 ? hi - lo : (hi - lo) / (count - 1);
+      // Each key slot has fallback positions along the seam, tried in order if the preferred one
+      // turns out to be too thin (e.g. under a lake); the first that fits is used.
+      for (let k = 0; k < count; k++) for (const [pref, f] of [0, -0.2, 0.2, -0.35, 0.35].entries()) {
+        const s = (count === 1 ? (lo + hi) / 2 : lo + spacing * k) + f * spacing;
+        if (s < lo || s > hi) continue;
+        const c = sm.coord === 'x' ? { x: sm.val, y: s } : { x: s, y: sm.val };
+        const P0 = (du, dn, n) => ({ x: c.x + sm.u.x * du + n.x * dn, y: c.y + sm.u.y * du + n.y * dn });
+        const nB = { x: -sm.nA.x, y: -sm.nA.y };
+        const key = {
+          slot: `${sm.A.name}|${sm.B.name}|${k}`, pref, c, u: sm.u, nA: sm.nA, a, w0, w1, tiles: [sm.A, sm.B],
+          S: P0(-w0 / 2, 0, sm.nA), T: P0(w0 / 2, 0, sm.nA),
+          inner: [[P0(-w1 / 2, a, sm.nA), P0(w1 / 2, a, sm.nA)], [P0(-w1 / 2, a, nB), P0(w1 / 2, a, nB)]]
+        };
+        // The pocket must sit well inside both tiles (not near another edge of the outline).
+        if (key.inner.every((pts, n) => pts.every(p => inRing(p.x, p.y, key.tiles[n].ring) && distToRing(p.x, p.y, key.tiles[n].ring) > 1))) keys.push(key);
+      }
+    }
+    // Insert pocket mouths into both tile outlines so they become boundary vertices.
+    for (const t of tiles) {
+      const pts = keys.filter(kk => kk.tiles.includes(t)).flatMap(kk => [kk.S, kk.T]);
+      if (!pts.length) continue;
+      const out = [];
+      for (let i = 0; i < t.ring.length; i++) {
+        const p = t.ring[i], q = t.ring[(i + 1) % t.ring.length], dx = q.x - p.x, dy = q.y - p.y, l2 = dx * dx + dy * dy;
+        out.push(p);
+        const on = pts.filter(m => Math.abs(dx * (m.y - p.y) - dy * (m.x - p.x)) < 1e-9 * Math.sqrt(l2))
+          .map(m => ({ m, t: ((m.x - p.x) * dx + (m.y - p.y) * dy) / l2 })).filter(o => o.t > 1e-9 && o.t < 1 - 1e-9).sort((A, B) => A.t - B.t);
+        out.push(...on.map(o => o.m));
+      }
+      t.ring = out;
+    }
   }
 
   /* ---------- terrain (+ water) per tile ---------- */
@@ -126,6 +184,7 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
   const zAt = (x, y) => zOf(elevAt(x, y));
 
   let wetArea = 0, allArea = 0;
+  const waterDepth = Math.min(S.waterDepth, S.base * 0.6); // never cut through the base
   for (const [k, t] of tiles.entries()) {
     if (tiled) { onStatus(`Building terrain — tile ${t.name} (${k + 1} of ${tiles.length})…`, lerp(P.terrain, 0.5 + k / tiles.length * 0.5)); await tick(); }
     const T = t.T;
@@ -143,17 +202,49 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
       }
       wetArea += wet;
       if (wet > 0) {
-        const depth = Math.min(S.waterDepth, S.base * 0.6); // never cut through the base
         const R = refineWater(T, isWater); // remove zero-thickness pinches in the water solid
-        const split = splitWater(R.T, zOf, R.isWater, depth);
+        const split = splitWater(R.T, zOf, R.isWater, waterDepth);
         t.parts.water = split.water;
-        terrain = terrainSolid(R.T, zOf, split.zs);
+        terrain = { T: R.T, zs: split.zs };
       }
     }
-    t.parts.terrain = terrain || terrainSolid(T, zOf);
-    t.T = null; // free memory
+    t.solid = terrain || { T, zs: null }; // built below, once the connector pockets are settled
+    t.T = null;
   }
   const waterShare = allArea ? wetArea / allArea : 0;
+
+  // Keep only keys with enough material above both pockets (≥ 0.8 mm), e.g. not under lakes.
+  const keysPlanned = new Set(keys.map(kk => kk.slot)).size; // slots, not fallback positions
+  if (keys.length) {
+    const wetAt = (x, y) => (mask && mask.kindAt(x, y) !== WATER.NONE) || (wantWater && S.sea && elev && seaLevelAt(x, y) <= 0);
+    const topAt = (x, y) => zAt(x, y) - (wantWater && wetAt(x, y) ? waterDepth : 0) - (h || 1) * 0.07;
+    keys = keys.filter(kk => kk.inner.every(([p, q]) => {
+      for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) {
+        const mouth = { x: kk.S.x + (kk.T.x - kk.S.x) * i / 4, y: kk.S.y + (kk.T.y - kk.S.y) * i / 4 }, in_ = { x: p.x + (q.x - p.x) * i / 4, y: p.y + (q.y - p.y) * i / 4 };
+        const x = mouth.x + (in_.x - mouth.x) * j / 4, y = mouth.y + (in_.y - mouth.y) * j / 4;
+        if (topAt(x, y) < pocketD + 0.8) return false;
+      }
+      return true;
+    }));
+    // One key per slot: the most preferred position that passed.
+    const best = new Map();
+    for (const kk of keys) if (!best.has(kk.slot) || kk.pref < best.get(kk.slot).pref) best.set(kk.slot, kk);
+    keys = [...best.values()];
+  }
+  // Build each tile's solid with its pockets. A tile that can't take them drops those keys (and its
+  // neighbours are rebuilt without them).
+  const pocketsOf = t => keys.filter(kk => kk.tiles.includes(t)).map(kk => ({ S: kk.S, T: kk.T, inner: kk.inner[kk.tiles.indexOf(t)], d: pocketD }));
+  for (let pass = 0, todo = tiles.slice(); todo.length && pass < 4; pass++) {
+    const failed = [];
+    for (const t of todo) {
+      const res = terrainSolid(t.solid.T, zOf, t.solid.zs, pocketsOf(t));
+      if (res) t.parts.terrain = res; else failed.push(t);
+    }
+    const dropped = keys.filter(kk => kk.tiles.some(t => failed.includes(t)));
+    keys = keys.filter(kk => !dropped.includes(kk));
+    todo = [...new Set(failed.concat(dropped.flatMap(kk => kk.tiles)))];
+  }
+  for (const t of tiles) { if (!t.parts.terrain.length) t.parts.terrain = terrainSolid(t.solid.T, zOf, t.solid.zs); t.solid = null; }
 
   /* ---------- buildings (clipped at tile edges) ---------- */
   let nB = 0;
@@ -246,6 +337,24 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
       addPrism(host.parts.label, p.outer, p.holes, S.base - 0.3, S.base + S.labelH);
     }
   }
+
+  /* ---------- connector keys piece ---------- */
+  // The keys, laid out in a compact grid (so the piece fits a bed), 0.15 mm smaller than the
+  // pockets all round and 0.2 mm thinner than they are deep.
+  if (keys.length) {
+    const host = { name: 'Keys', rect: null, offset: [0, -((ny - 1) / 2 + (labelText ? 2.2 : 1)) * TILE_GAP], parts: Object.fromEntries(PARTS.map(([id]) => [id, []])) };
+    const cl = 0.15, kk0 = keys[0], gapK = 3, perRow = Math.max(1, Math.floor((rx1 - rx0) / (kk0.w1 + gapK)));
+    const yBase = ry0 - (labelText ? Math.min(14, Math.max(5, (rx1 - rx0) * 0.07)) * 1.9 : 0) - 10 - kk0.a;
+    keys.forEach((kk, n) => {
+      const cx = rx0 + kk.w1 / 2 + (n % perRow) * (kk.w1 + gapK), cy = yBase - Math.floor(n / perRow) * (2 * kk.a + gapK);
+      const A = kk.a - cl, W0 = kk.w0 / 2 - cl, W1 = kk.w1 / 2 - cl;
+      const bowtie = [{ x: cx - W1, y: cy - A }, { x: cx + W1, y: cy - A }, { x: cx + W0, y: cy }, { x: cx + W1, y: cy + A }, { x: cx - W1, y: cy + A }, { x: cx - W0, y: cy }];
+      addPrism(host.parts.keys, bowtie, [], 0, pocketD - 0.2);
+    });
+    tiles.push(host);
+    notes.push(`${keys.length} connector key${keys.length === 1 ? '' : 's'}: print the “Connector keys” piece and push one key into each pair of matching pockets on the tiles’ undersides (a drop of glue holds them).`);
+  }
+  if (keysPlanned > keys.length) notes.push(`${keysPlanned - keys.length} connector key position${keysPlanned - keys.length === 1 ? ' was' : 's were'} skipped where the model is too thin above the pocket (e.g. under lakes).`);
 
   /* ---------- output ---------- */
   onStatus('Preparing preview…', P.done); await tick();

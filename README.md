@@ -83,6 +83,8 @@ The 3MF writer (`js/threemf.js`) needs no library: it builds the XML with shared
 
 **Split into tiles** (columns × rows, up to 6 × 6) cuts a model that is bigger than your print bed into pieces that fit together. The panel shows each tile's size as you change it. Each tile is built as its own set of watertight parts, from the print outline clipped to the tile. Tiles share one height scale and base, so they line up exactly. Buildings and road/route pieces that cross a seam are cut at it. The preview spreads the tiles slightly apart; downloaded files keep their real positions. Each tile downloads as one file, or part by part for multi-colour. With a label, the label plate is its own piece.
 
+**Connector keys** (on by default when tiled) join neighbouring tiles. Each seam gets a bowtie key about every 50 mm. Both tiles have a half-dovetail pocket cut into their underside at the seam, wider inside than at the edge, so a key locks the tiles together and holds them in line. Print the *Connector keys* piece (keys are 0.15 mm smaller than the pockets and 0.2 mm thinner than they are deep), push one into each pair of pockets from below, and add a drop of glue. Pockets are only cut where at least 0.8 mm of model remains above them; a position under a lake moves along the seam, or is skipped with a note.
+
 Freeform areas whose outline crosses a tile edge more than once can get an uneven edge on that tile (the app notes it). Concave buildings that a seam would break apart are left out of that tile.
 
 ## Label

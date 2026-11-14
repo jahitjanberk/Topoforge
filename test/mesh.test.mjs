@@ -128,3 +128,20 @@ test('adaptive mesh: far fewer triangles on flat ground, same accuracy', () => {
   assert.ok(eA.max < eU.max + tolMm, `adaptive max error ${eA.max.toFixed(3)} mm vs uniform ${eU.max.toFixed(3)} mm`);
   assert.ok(eA.rms < eU.rms * 1.25, `adaptive rms error ${eA.rms.toFixed(4)} mm vs uniform ${eU.rms.toFixed(4)} mm`);
 });
+
+test('connector pockets: watertight, and exactly the pocket volume is removed', () => {
+  // Square with extra outline vertices where two dovetail pockets open (bottom and right edges).
+  const ring = [{ x: -40, y: -40 }, { x: -3, y: -40 }, { x: 3, y: -40 }, { x: 40, y: -40 }, { x: 40, y: 7 }, { x: 40, y: 13 }, { x: 40, y: 40 }, { x: -40, y: 40 }];
+  const T = buildTerrain(ring, 1.0, hills, [], { tolM: 0.05 / 0.2 }), zOf = zOfFor(T);
+  const d = 1.5;
+  const pockets = [
+    { S: { x: -3, y: -40 }, T: { x: 3, y: -40 }, inner: [{ x: -5, y: -33 }, { x: 5, y: -33 }], d },  // widens inward: a dovetail
+    { S: { x: 40, y: 7 }, T: { x: 40, y: 13 }, inner: [{ x: 33, y: 5 }, { x: 33, y: 15 }], d }
+  ];
+  const plain = checkSolid(terrainSolid(T, zOf)).volume;
+  const r = assertSolid(terrainSolid(T, zOf, null, pockets), 'terrain with pockets');
+  const pocketVolume = 2 * ((6 + 10) / 2 * 7) * d; // two trapezoids, 7 mm deep into the tile
+  assert.ok(Math.abs(plain - r.volume - pocketVolume) < 1e-6, `removed ${(plain - r.volume).toFixed(4)} mm³, expected ${pocketVolume}`);
+  // A pocket whose mouth isn't on the outline can't be cut: the caller gets null and builds without.
+  assert.equal(terrainSolid(T, zOf, null, [{ S: { x: 0, y: 0 }, T: { x: 1, y: 0 }, inner: [], d }]), null);
+});

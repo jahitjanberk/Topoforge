@@ -620,7 +620,8 @@ const setSurface = v => { $$('#surface button').forEach(x => x.classList.toggle(
 $$('#surface button').forEach(b => b.onclick = () => { setSurface(b.dataset.v); save(); });
 ['lTerrain', 'lWater', 'lBuildings', 'lRoads', 'lPaths', 'lRoute', 'cSea'].forEach(id => $('#' + id).addEventListener('change', () => { syncLayerUi(); updateAreaPanel(); save(); }));
 $('#tLabel').addEventListener('change', save);
-['selTX', 'selTY'].forEach(id => $('#' + id).addEventListener('change', () => { updateAreaPanel(); save(); }));
+['selTX', 'selTY'].forEach(id => $('#' + id).addEventListener('change', () => { syncLayerUi(); updateAreaPanel(); save(); }));
+$('#cKeys').addEventListener('change', save);
 $('#labelPlace').onclick = () => {
   const c = state.shape ? L.latLngBounds(shapeRing(state.shape, 16)).getCenter() : map.getCenter();
   $('#tLabel').value = state.place || `${c.lat.toFixed(4)}°, ${c.lng.toFixed(4)}°`;
@@ -630,6 +631,7 @@ function syncLayerUi() {
   const terrain = $('#lTerrain').checked;
   $('#fExag').style.opacity = terrain ? 1 : .4;
   $('#fSurface').style.opacity = terrain ? 1 : .4;
+  $('#fKeys').classList.toggle('hidden', (+$('#selTX').value || 1) * (+$('#selTY').value || 1) <= 1);
   $('#fStep').classList.toggle('hidden', !(terrain && $('#surface button.active')?.dataset.v === 'stepped'));
   // Water is cut into the terrain surface, so it needs terrain.
   $('#lWater').disabled = !terrain;
@@ -652,7 +654,7 @@ function readSettings() {
     route: state.route && $('#lRoute').checked ? state.route.segs : null, routeW: +$('#sRtW').value, routeH: +$('#sRtH').value,
     label: $('#tLabel').value.trim(), labelH: +$('#sLblH').value,
     stepped: $('#lTerrain').checked && ($('#surface button.active') || {}).dataset?.v === 'stepped', stepMm: +$('#sStep').value,
-    tilesX: +$('#selTX').value || 1, tilesY: +$('#selTY').value || 1
+    tilesX: +$('#selTX').value || 1, tilesY: +$('#selTY').value || 1, connectors: $('#cKeys').checked
   };
 }
 

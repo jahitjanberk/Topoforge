@@ -106,8 +106,8 @@ test('a two-part model exports as one object with two named, coloured parts', as
 test('a real tiled model exports one object per tile, each with watertight coloured parts', async () => {
   const model = await buildModel(RING, { ...SETTINGS, tilesX: 2, tilesY: 1, label: '' });
   const { objects, items, bases } = await read3MF(await to3MF(Mapcast.modelPieces(model, 'Test')));
-  assert.deepEqual(items.map(i => objects.get(i).name), ['Test — tile A1', 'Test — tile B1']);
-  assert.deepEqual(bases.map(b => b.name).sort(), ['Buildings', 'Roads', 'Route', 'Terrain &amp; base'], 'one material per part type, shared by tiles');
+  assert.deepEqual(items.map(i => objects.get(i).name), ['Test — tile A1', 'Test — tile B1', 'Test — connector keys']);
+  assert.deepEqual(bases.map(b => b.name).sort(), ['Buildings', 'Connector keys', 'Roads', 'Route', 'Terrain &amp; base'], 'one material per part type, shared by tiles');
   let parts = 0;
   for (const i of items) parts += checkObject(objects.get(i), bases).length;
   assert.equal(parts, model.layers.length);

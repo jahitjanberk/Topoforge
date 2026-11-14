@@ -147,7 +147,7 @@ function modelPieces(model, title, onlyTile = null) {
   const part = l => ({ name: l.tile ? l.name.slice(l.tile.length + 3) : l.name, color: l.color, arr: l.arr });
   if (!model.tiles) return [{ name: title, parts: model.layers.map(part) }];
   return model.tiles.filter(t => !onlyTile || t.name === onlyTile).map(t => ({
-    name: t.name === 'Label' ? `${title} — label plate` : `${title} — tile ${t.name}`,
+    name: t.name === 'Label' ? `${title} — label plate` : t.name === 'Keys' ? `${title} — connector keys` : `${title} — tile ${t.name}`,
     parts: model.layers.filter(l => l.tile === t.name).map(part)
   }));
 }

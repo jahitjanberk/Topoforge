@@ -160,8 +160,10 @@ const SCENARIOS = {
     const ui = await evaluate(`({ rows: document.querySelectorAll('#dlParts .tile-row').length, label: document.querySelector('#partsLabel').textContent, tiles: (window.__mapcast.lastModel.tiles || []).map(t => t.name) })`);
     await evaluate(`(() => { for (const id of ['selTX', 'selTY']) { const s = document.getElementById(id); s.value = '1'; s.dispatchEvent(new Event('change')); }
       const t = document.querySelector('#tLabel'); t.value = ''; t.dispatchEvent(new Event('change')); return true; })()`);
-    check('2 × 2 tiles (+ label plate) generate', !r.failed && ui.tiles.join() === 'A1,B1,A2,B2,Label', `${r.ms} ms · ${JSON.stringify(ui)}`);
+    check('2 × 2 tiles (+ label plate, keys) generate', !r.failed && ui.tiles.join().startsWith('A1,B1,A2,B2,Label'), `${r.ms} ms · ${JSON.stringify(ui)}`);
     check('every tile part is watertight', partsOk(r.parts), `${Object.keys(r.parts).length} parts`);
+    const notes = await evaluate(`document.querySelector('#status').textContent`);
+    check('connector keys are included (or explained)', /connector key/.test(notes), notes);
     await screenshot('tiles.png');
   },
   async threemf() {

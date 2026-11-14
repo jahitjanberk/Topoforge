@@ -65,7 +65,7 @@ async function showPreview(model) {
     parts.innerHTML = model.tiles.map(t => {
       const ls = model.layers.map((l, i) => ({ l, i })).filter(x => x.l.tile === t.name);
       const chips = ls.length > 1 ? `<div class="tile-parts">${ls.map(({ l, i }) => `<button data-i="${i}" title="Download ${l.name}"><i style="background:${l.color}"></i>${partName(l)}</button>`).join('')}</div>` : '';
-      return `<div class="tile-row"><button data-tile="${t.name}"><b>${t.name === 'Label' ? 'Label plate' : 'Tile ' + t.name}</b><small>3MF</small></button>${chips}</div>`;
+      return `<div class="tile-row"><button data-tile="${t.name}"><b>${t.name === 'Label' ? 'Label plate' : t.name === 'Keys' ? 'Connector keys' : 'Tile ' + t.name}</b><small>3MF</small></button>${chips}</div>`;
     }).join('');
     // A tile downloads as a 3MF (all its parts, coloured); the chips below give single-part STLs.
     $$('#dlParts [data-tile]').forEach(b => b.onclick = async () => {

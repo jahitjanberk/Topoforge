@@ -26,7 +26,7 @@ test('untiled model: every part watertight', async () => {
 test('2 × 2 tiles: watertight, inside their tiles, and adding up to the whole', async () => {
   const whole = await buildModel(RING, SETTINGS);
   const m = await buildModel(RING, { ...SETTINGS, tilesX: 2, tilesY: 2 });
-  assert.deepEqual(m.tiles.map(t => t.name), ['A1', 'B1', 'A2', 'B2']);
+  assert.deepEqual(m.tiles.map(t => t.name), ['A1', 'B1', 'A2', 'B2', 'Keys'], 'four tiles plus the connector keys piece');
   assertAllWatertight(m);
 
   // Each tile's geometry stays within its quarter of the footprint (tiles must fit side by side).
@@ -34,7 +34,7 @@ test('2 × 2 tiles: watertight, inside their tiles, and adding up to the whole',
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   for (let i = 0; i < all.length; i += 3) { x0 = Math.min(x0, all[i]); x1 = Math.max(x1, all[i]); y0 = Math.min(y0, all[i + 1]); y1 = Math.max(y1, all[i + 1]); }
   const xm = (x0 + x1) / 2, ym = (y0 + y1) / 2, eps = 1e-3;
-  for (const l of m.layers) {
+  for (const l of m.layers.filter(l => l.tile !== 'Keys')) {
     const east = l.tile[0] === 'B', south = l.tile[1] === '2';
     for (let i = 0; i < l.arr.length; i += 3) {
       const x = l.arr[i], y = l.arr[i + 1];
@@ -54,7 +54,7 @@ test('2 × 2 tiles: watertight, inside their tiles, and adding up to the whole',
 test('tiles with stepped terrain and a non-rectangular (circle) area', async () => {
   const c = { lat: 46.70, lng: 7.865 }, circle = Array.from({ length: 96 }, (_, i) => ({ lat: c.lat + 0.009 * Math.sin(i / 96 * 2 * Math.PI), lng: c.lng + 0.013 * Math.cos(i / 96 * 2 * Math.PI) }));
   const m = await buildModel(circle, { ...SETTINGS, tilesX: 3, tilesY: 2, stepped: true, stepMm: 1.5 });
-  assert.equal(m.tiles.length, 6);
+  assert.deepEqual(m.tiles.map(t => t.name).filter(n => n !== 'Keys'), ['A1', 'B1', 'C1', 'A2', 'B2', 'C2']);
   assertAllWatertight(m);
 });
 
@@ -69,4 +69,23 @@ test('when OpenStreetMap is down, the terrain is still built and the note says w
     // Without terrain there would be nothing to print: report the error instead.
     await assert.rejects(buildModel(RING, { ...SETTINGS, terrain: false, route: null }), /busy/);
   } finally { globalThis.__osmDown = false; }
+});
+
+test('connector keys: one per seam, pockets cut, keys fit, everything watertight', async () => {
+  const m = await buildModel(RING, { ...SETTINGS, tilesX: 2, tilesY: 2, connectors: true });
+  const keys = m.layers.find(l => l.part === 'keys');
+  assert.ok(keys, 'a connector keys piece');
+  const r = checkSolid(keys.arr);
+  assert.ok(isWatertight(r), `keys not watertight: ${JSON.stringify(r)}`);
+  const plain = await buildModel(RING, { ...SETTINGS, tilesX: 2, tilesY: 2, connectors: false });
+  assert.ok(!plain.layers.some(l => l.part === 'keys'), 'no keys when switched off');
+  assert.match(m.notes.join(' '), /4 connector keys/, 'one key per seam on a 2 × 2 grid');
+  // Pockets: tiles lose material, roughly the keys' volume plus fit clearance.
+  const tv = mm => mm.layers.filter(l => l.part === 'terrain').reduce((s, l) => s + checkSolid(l.arr).volume, 0);
+  const removed = tv(plain) - tv(m);
+  assert.ok(removed > r.volume && removed < r.volume * 1.6, `pockets removed ${removed.toFixed(0)} mm³ for keys of ${r.volume.toFixed(0)} mm³`);
+  // Keys are thinner than the pockets are deep, so they sit flush or below the tiles' undersides.
+  let zMax = 0; for (let i = 2; i < keys.arr.length; i += 3) zMax = Math.max(zMax, keys.arr[i]);
+  assert.ok(zMax <= SETTINGS.base * 0.5 - 0.2 + 1e-6, `key thickness ${zMax}`);
+  assertAllWatertight(m);
 });
