@@ -12,6 +12,16 @@ An internet connection is needed for map tiles, elevation data and the CDN libra
 
 The scripts in `js/` are plain (non-module) scripts. Each file wraps its code in a function and shares what other files need on `window.Mapcast`, so load order in `index.html` matters.
 
+## Tests
+
+```sh
+npm install          # once: dev copies of the geometry libraries the page loads from the CDN
+npm test             # unit tests (Node, no network): every mesh part must be a watertight solid
+npm run test:e2e     # browser tests in headless Edge/Chrome (needs internet; BROWSER=… to pick one)
+```
+
+`test/solid.mjs` holds the watertightness check: every edge is used exactly twice, in opposite directions, with positive volume. The unit tests and the browser tests share it. Screenshots from the browser tests are saved to `test/output/`.
+
 ## Structure
 
 ```

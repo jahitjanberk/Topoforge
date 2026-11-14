@@ -4,6 +4,12 @@
   "private": true,
   "description": "Find a place and export its terrain as an STL for 3D printing.",
   "scripts": {
-    "start": "node serve.js"
+    "start": "node serve.js",
+    "test": "node --test test/*.test.mjs",
+    "test:e2e": "node test/e2e.mjs"
+  },
+  "devDependencies": {
+    "delaunator": "5.1.0",
+    "earcut": "3.2.4"
   }
 }
