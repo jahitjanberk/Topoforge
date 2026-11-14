@@ -3,9 +3,9 @@
 :root{
   --ink:#17171a; --ink2:#3f3f46; --muted:#71717a; --line:#e7e5e4; --bg:#f6f5f3; --panel:#ffffff;
   --surface:#ffffff; --sunken:#f4f3f1; --on-ink:#ffffff; --disabled:#d6d3d1; --disabled-ink:#ffffff;
-  --accent:#f25c2a; --accent-d:#d9481a; --accent-soft:#fff0e9; --ok:#15803d; --err:#b91c1c;
+  --accent:#4f46e5; --accent-d:#4338ca; --accent-soft:#eef2ff; --ok:#15803d; --err:#b91c1c;
   --warn-fg:#9a3412; --warn-bg:#fff7ed; --warn-line:#fed7aa;
-  --map-bg:#e8e6e1; --canvas-1:#ffffff; --canvas-2:#ecebe8; --glass:rgba(255,255,255,.85); --contour:rgba(242,92,42,.14);
+  --map-bg:#e8e6e1; --canvas-1:#ffffff; --canvas-2:#ecebe8; --glass:rgba(255,255,255,.85); --contour:rgba(79,70,229,.14);
   --r:12px; --shadow:0 6px 24px rgba(23,23,26,.10), 0 1px 3px rgba(23,23,26,.08);
   --sheet-h:0px;
   font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif; color:var(--ink); color-scheme:light;
@@ -14,18 +14,18 @@
   :root:not([data-theme="light"]){
     --ink:#f4f4f5; --ink2:#d4d4d8; --muted:#a1a1aa; --line:#2e2e34; --bg:#121214; --panel:#18181b;
     --surface:#202024; --sunken:#141417; --on-ink:#121214; --disabled:#34343a; --disabled-ink:#8a8a93;
-    --accent:#ff6a3d; --accent-d:#ff8a63; --accent-soft:rgba(255,106,61,.14); --err:#f87171;
+    --accent:#5f5bf0; --accent-d:#a5b4fc; --accent-soft:rgba(95,91,240,.14); --err:#f87171;
     --warn-fg:#fdba74; --warn-bg:rgba(251,146,60,.10); --warn-line:rgba(251,146,60,.30);
-    --map-bg:#1d1d20; --canvas-1:#2a2a2f; --canvas-2:#141416; --glass:rgba(24,24,27,.85); --contour:rgba(255,106,61,.16);
+    --map-bg:#1d1d20; --canvas-1:#2a2a2f; --canvas-2:#141416; --glass:rgba(24,24,27,.85); --contour:rgba(95,91,240,.16);
     --shadow:0 8px 28px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.4); color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --ink:#f4f4f5; --ink2:#d4d4d8; --muted:#a1a1aa; --line:#2e2e34; --bg:#121214; --panel:#18181b;
   --surface:#202024; --sunken:#141417; --on-ink:#121214; --disabled:#34343a; --disabled-ink:#8a8a93;
-  --accent:#ff6a3d; --accent-d:#ff8a63; --accent-soft:rgba(255,106,61,.14); --err:#f87171;
+  --accent:#5f5bf0; --accent-d:#a5b4fc; --accent-soft:rgba(95,91,240,.14); --err:#f87171;
   --warn-fg:#fdba74; --warn-bg:rgba(251,146,60,.10); --warn-line:rgba(251,146,60,.30);
-  --map-bg:#1d1d20; --canvas-1:#2a2a2f; --canvas-2:#141416; --glass:rgba(24,24,27,.85); --contour:rgba(255,106,61,.16);
+  --map-bg:#1d1d20; --canvas-1:#2a2a2f; --canvas-2:#141416; --glass:rgba(24,24,27,.85); --contour:rgba(95,91,240,.16);
   --shadow:0 8px 28px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.4); color-scheme:dark;
 }
 /* Theme icon: the moon offers dark, the sun offers light. */
@@ -47,7 +47,7 @@ input,select{font:inherit;color:inherit}
 .sheet-handle{display:none}
 /* Header with a faint contour-line pattern (the "topo" in Topoforge) */
 .brand{display:flex;gap:12px;align-items:center;padding:20px 18px 18px;border-bottom:1px solid var(--line);
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='90' viewBox='0 0 360 90' fill='none' stroke='%23f25c2a' stroke-opacity='.16' stroke-width='.9'%3E%3Cpath d='M-10 70 C40 40 90 85 150 55 S260 20 370 50'/%3E%3Cpath d='M-10 82 C50 55 100 92 160 68 S270 35 370 64'/%3E%3Cpath d='M-10 56 C30 28 80 70 140 42 S250 6 370 36'/%3E%3Cpath d='M200 10 C230 -2 280 30 320 14'/%3E%3Cpath d='M210 26 C240 12 285 46 330 28'/%3E%3C/svg%3E");
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='90' viewBox='0 0 360 90' fill='none' stroke='%234f46e5' stroke-opacity='.16' stroke-width='.9'%3E%3Cpath d='M-10 70 C40 40 90 85 150 55 S260 20 370 50'/%3E%3Cpath d='M-10 82 C50 55 100 92 160 68 S270 35 370 64'/%3E%3Cpath d='M-10 56 C30 28 80 70 140 42 S250 6 370 36'/%3E%3Cpath d='M200 10 C230 -2 280 30 320 14'/%3E%3Cpath d='M210 26 C240 12 285 46 330 28'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right -20px top 0;background-size:360px 90px;background-color:var(--panel)}
 .logo{width:40px;height:40px;border-radius:11px;background:#17171a;display:grid;place-items:center;flex:none;box-shadow:0 0 0 1px var(--line)}
 .brand-text{flex:1;min-width:0}
@@ -80,7 +80,7 @@ kbd{font-family:'JetBrains Mono',monospace;font-size:10.5px;border:1px solid var
 .route-dot{width:10px;height:10px;border-radius:50%;background:#e11d48;flex:none}
 .route-name{font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .route-km{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink2);white-space:nowrap}
-#mapwrap.dropping::after{content:"Drop a GPX file to add your route";position:absolute;inset:12px;z-index:1200;border:2px dashed var(--accent);border-radius:16px;background:rgba(242,92,42,.08);display:grid;place-items:center;font-weight:600;color:var(--accent-d);pointer-events:none}
+#mapwrap.dropping::after{content:"Drop a GPX file to add your route";position:absolute;inset:12px;z-index:1200;border:2px dashed var(--accent);border-radius:16px;background:rgba(79,70,229,.08);display:grid;place-items:center;font-weight:600;color:var(--accent-d);pointer-events:none}
 #areaInfo .empty{font-size:12.5px;color:var(--muted);margin:0;line-height:1.5}
 #areaInfo .empty b{color:var(--ink2);font-weight:600}
 .area-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
@@ -143,7 +143,7 @@ details.adv .inner{padding-top:12px}
 .estimate b{color:var(--ink2);font-weight:600}
 .estimate.big{color:var(--warn-fg)}
 .estimate.big b{color:var(--warn-fg)}
-.primary{width:100%;border:0;background:var(--accent);color:#fff;font-weight:600;font-size:14.5px;border-radius:11px;padding:12px;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .12s;box-shadow:0 1px 0 rgba(0,0,0,.05),0 4px 14px rgba(242,92,42,.25)}
+.primary{width:100%;border:0;background:var(--accent);color:#fff;font-weight:600;font-size:14.5px;border-radius:11px;padding:12px;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .12s;box-shadow:0 1px 0 rgba(0,0,0,.05),0 4px 14px rgba(79,70,229,.25)}
 .primary:hover{background:var(--accent-d)}
 .primary:disabled{background:var(--disabled);color:var(--disabled-ink);cursor:not-allowed;box-shadow:none}
 .primary.cancel{background:var(--ink);color:var(--on-ink);box-shadow:none}
@@ -173,7 +173,7 @@ details.adv .inner{padding-top:12px}
 /* While no area exists, draw attention to the drawing tools */
 #mapwrap.no-area .maptools{box-shadow:var(--shadow),0 0 0 3px var(--accent-soft),0 0 0 4px var(--accent)}
 #hint{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:1000;background:rgba(23,23,26,.88);color:#fff;font-size:12.5px;padding:8px 14px;border-radius:999px;max-width:calc(100% - 140px);text-align:center;pointer-events:none;line-height:1.4;backdrop-filter:blur(6px)}
-#hint b{color:#ffb597;font-weight:600}
+#hint b{color:#c7d2fe;font-weight:600}
 #cursorLabel{position:absolute;z-index:1001;pointer-events:none;background:var(--ink);color:var(--on-ink);font:500 11.5px 'JetBrains Mono',monospace;padding:4px 7px;border-radius:6px;white-space:nowrap;transform:translate(14px,14px)}
 .basemap{position:absolute;top:14px;right:14px;z-index:1000;background:var(--surface);border-radius:10px;box-shadow:var(--shadow);display:flex;padding:3px}
 .basemap button{border:0;background:transparent;padding:6px 10px;font-size:12px;font-weight:500;border-radius:7px;color:var(--ink2)}
@@ -204,7 +204,7 @@ details.adv .inner{padding-top:12px}
 /* First-visit welcome */
 .welcome{position:absolute;inset:0;z-index:1150;display:grid;place-items:center;padding:16px;background:rgba(17,17,20,.35)}
 .welcome-card{width:min(430px,100%);background:var(--surface);border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.3);padding:24px 24px 20px;animation:mc-pop .24s cubic-bezier(.2,.9,.3,1.15);
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='430' height='110' viewBox='0 0 430 110' fill='none' stroke='%23f25c2a' stroke-opacity='.18' stroke-width='1.2'%3E%3Cpath d='M-10 60 C60 20 120 90 200 50 S330 10 440 45'/%3E%3Cpath d='M-10 78 C70 40 130 104 210 68 S340 28 440 62'/%3E%3Cpath d='M-10 42 C50 4 110 70 190 32 S320 -8 440 26'/%3E%3C/svg%3E");
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='430' height='110' viewBox='0 0 430 110' fill='none' stroke='%234f46e5' stroke-opacity='.18' stroke-width='1.2'%3E%3Cpath d='M-10 60 C60 20 120 90 200 50 S330 10 440 45'/%3E%3Cpath d='M-10 78 C70 40 130 104 210 68 S340 28 440 62'/%3E%3Cpath d='M-10 42 C50 4 110 70 190 32 S320 -8 440 26'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:top center}
 .welcome-card h2{margin:6px 0 16px;font-size:21px;letter-spacing:-.02em}
 .welcome-steps{margin:0 0 14px;padding:0;list-style:none;counter-reset:w;display:flex;flex-direction:column;gap:12px}

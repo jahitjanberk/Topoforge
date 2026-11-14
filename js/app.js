@@ -12,7 +12,7 @@ const { createGenerator } = Topoforge;
 const { showPreview, closePreview, isPreviewOpen } = Topoforge;
 const { toSTL, download } = Topoforge;
 
-const ACCENT = '#f25c2a';
+const ACCENT = '#4f46e5';
 const STORE = 'topoforge-v1';
 
 const state = { tool: 'select', shape: null, place: '', relief: true, view3d: false, route: null };

@@ -11,7 +11,7 @@ const { OSM } = Topoforge;
 const MAPLIBRE_VERSION = '4.7.1';
 const MAPLIBRE_JS = `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.js`;
 const MAPLIBRE_CSS = `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.css`;
-const ACCENT = '#f25c2a';
+const ACCENT = '#4f46e5';
 const DEM_ATTR = 'Elevation: <a href="https://registry.opendata.aws/terrain-tiles/">Mapzen / AWS Terrain Tiles</a>';
 const EMPTY = { type: 'FeatureCollection', features: [] };
 
