@@ -54,6 +54,19 @@ js/
 - Map tiles: [OpenStreetMap](https://www.openstreetmap.org/copyright) standard tiles, subject to the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/). Switch to a hosted provider before heavy use.
 - Buildings, roads and water: OpenStreetMap through the Overpass API.
 
+## Mesh size
+
+The terrain mesh is adaptive. Cells start large and are split, worst first, where a flat surface would miss the real height by more than ~7% of the mesh spacing (about 0.05 mm at Standard). Splitting stops once the vertex count reaches what an even grid would use, so a model is never bigger than before. Flat ground (plains, lakes, terrace tops) gets a few large triangles, and the saved vertices go to the most detailed ground. Measured with `npm run test:e2e measure`:
+
+| Area | Even grid | Adaptive |
+|---|---|---|
+| Netherlands polders (flat) | 93,728 triangles | 12,210 (13%) |
+| Lake Thun, water on | 139,484 | 115,990 (83%) |
+| Lake Thun, stepped | 207,890 | 148,052 (71%, with sparser contour pairs) |
+| Bernese Alps (steep) | 93,728 | 92,500 (99%) |
+
+On a synthetic test landscape the adaptive mesh uses 44% fewer triangles with the same height error as the even grid (max 0.33 mm, average 0.034 mm; see `test/mesh.test.mjs`).
+
 ## GPX routes
 
 **Import a GPX route…** in step 2, or drop a `.gpx` file on the map. Track segments and routes are read; waypoints are ignored. The route is drawn on the 2D map and in the 3D view, and the print area is fitted around it unless it's already inside one. In the model it becomes a raised strip that follows the terrain, as its own `*-route.stl` part. Width and height are under Advanced.

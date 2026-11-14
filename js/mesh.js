@@ -16,9 +16,78 @@ function earcutWinding(tr, at) {
 }
 function pushTri(o, ax, ay, az, bx, by, bz, cx, cy, cz) { o.push(ax, ay, az, bx, by, bz, cx, cy, cz); }
 
+// Adaptive vertex placement. Square cells start large and are split in four, worst cell first,
+// while some cell's flat approximation misses the real elevation by more than tolM, and only
+// while the vertex count stays within what the uniform grid would use (its budget). So the mesh
+// is never larger than the uniform one: flat ground (plains, lakes, terrace tops) gets a few big
+// triangles, and the vertices saved there go where the ground is most detailed. Cells touching
+// the print outline are always refined fully, so the outline gets a fine band as before.
+function adaptivePoints(ring, h, elevAt, tolM, emitPoint) {
+  const [minx, miny, maxx, maxy] = bbox(ring);
+  // Finest cells are 0.8h squares, a little denser than the uniform grid, so detailed spots can
+  // be refined beyond it when the budget allows (accuracy measured in test/mesh.test.mjs).
+  const hf = h * 0.8, S0 = hf * 8, q = hf / 4, memo = new Map(), emitted = new Set();
+  const budget = Math.abs(signedArea(ring)) / (0.866 * h * h); // the uniform grid's interior vertex count
+  const E = (x, y) => { // elevation, memoised on a lattice shared between cell levels
+    const k = Math.round((x - minx) / q) * 1048576 + Math.round((y - miny) / q);
+    let v = memo.get(k); if (v === undefined) { v = elevAt(x, y); memo.set(k, v); } return v;
+  };
+  // Largest miss of the cell's flat approximation, sampled every h/2. The mesh covers the cell
+  // with two triangles along one diagonal or the other, so both are checked.
+  const errorOf = (x, y, s) => {
+    const z00 = E(x, y), z10 = E(x + s, y), z01 = E(x, y + s), z11 = E(x + s, y + s), n = Math.max(2, Math.round(2 * s / h));
+    let worst = 0;
+    for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {
+      const u = i / n, v = j / n, z = E(x + u * s, y + v * s);
+      const pA = u >= v ? z00 + (z10 - z00) * u + (z11 - z10) * v : z00 + (z11 - z01) * u + (z01 - z00) * v;   // diagonal 00–11
+      const pB = u + v <= 1 ? z00 + (z10 - z00) * u + (z01 - z00) * v : z11 + (z01 - z11) * (1 - u) + (z10 - z11) * (1 - v); // diagonal 10–01
+      worst = Math.max(worst, Math.abs(z - pA), Math.abs(z - pB));
+    }
+    return worst;
+  };
+  // Max-heap of cells by error.
+  const heap = [];
+  const push = c => { heap.push(c); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p].e >= heap[i].e) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+  const pop = () => {
+    const top = heap[0], last = heap.pop();
+    if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l].e > heap[m].e) m = l; if (r < heap.length && heap[r].e > heap[m].e) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } }
+    return top;
+  };
+  // Exact vertex count: corners are shared between cells, so count how many cells use each one.
+  const cornerKey = (x, y) => Math.round((x - minx) / hf) * 1048576 + Math.round((y - miny) / hf);
+  const uses = new Map(); let vertices = 0;
+  const corners = (c, d) => {
+    for (const [x, y] of [[c.x, c.y], [c.x + c.s, c.y], [c.x, c.y + c.s], [c.x + c.s, c.y + c.s]]) {
+      const k = cornerKey(x, y), n = (uses.get(k) || 0) + d;
+      if (n === 0) { uses.delete(k); vertices--; } else { if (!uses.has(k)) vertices++; uses.set(k, n); }
+    }
+  };
+  const add = (x, y, s) => {
+    const cx = x + s / 2, cy = y + s / 2, dEdge = distToRing(cx, cy, ring);
+    if (!inRing(cx, cy, ring) && dEdge > s * 0.75) return; // fully outside
+    const e = s <= hf * 1.01 ? -1 : dEdge < s * 0.75 ? Infinity : errorOf(x, y, s); // -1: can't split
+    const c = { x, y, s, e }; push(c); corners(c, 1);
+  };
+  for (let y = miny; y < maxy; y += S0) for (let x = minx; x < maxx; x += S0) add(x, y, S0);
+  while (heap.length && heap[0].e > tolM) {
+    // Splitting adds up to 5 vertices; stop once that would exceed the uniform grid's count.
+    if (heap[0].e !== Infinity && vertices + 5 > budget) break;
+    const c = pop(); corners(c, -1);
+    const s2 = c.s / 2;
+    add(c.x, c.y, s2); add(c.x + s2, c.y, s2); add(c.x, c.y + s2, s2); add(c.x + s2, c.y + s2, s2);
+  }
+  const emit = (x, y) => {
+    const k = cornerKey(x, y);
+    if (!emitted.has(k)) { emitted.add(k); emitPoint(x, y); }
+  };
+  for (const c of heap) { emit(c.x, c.y); emit(c.x + c.s, c.y); emit(c.x, c.y + c.s); emit(c.x + c.s, c.y + c.s); }
+}
+
 // Watertight terrain solid clipped to ring. h = sample spacing (null → flat slab).
 // extraPts: additional vertices (e.g. shorelines) that the grid makes room for.
-function buildTerrain(ring, h, elevAt, extraPts = []) {
+// opts.tolM: if set, place vertices adaptively (see adaptivePoints) with this height tolerance in
+// elevation units; otherwise use a uniform grid.
+function buildTerrain(ring, h, elevAt, extraPts = [], opts = {}) {
   const B = [];
   for (let i = 0, n = ring.length; i < n; i++) {
     const a = ring[i], b = ring[(i + 1) % n], len = Math.hypot(b.x - a.x, b.y - a.y);
@@ -38,11 +107,15 @@ function buildTerrain(ring, h, elevAt, extraPts = []) {
     // Forced points (contour pairs for stepped terrain) go in as-is: they are deliberately close.
     for (const p of extraPts) if (p.force && inRing(p.x, p.y, ring) && distToRing(p.x, p.y, ring) > h * 0.5) add({ x: p.x, y: p.y });
     for (const p of extraPts) if (!p.force && inRing(p.x, p.y, ring) && distToRing(p.x, p.y, ring) > h * 0.5 && !near(p.x, p.y, h * 0.3)) add({ x: p.x, y: p.y });
-    const [minx, miny, maxx, maxy] = bbox(ring);
-    let row = 0;
-    for (let y = miny + h * 0.5; y < maxy; y += h * 0.866, row++)
-      for (let x = minx + (row % 2 ? h * 0.75 : h * 0.25); x < maxx; x += h)
-        if (inRing(x, y, ring) && distToRing(x, y, ring) > h * 0.5 && (!extraPts.length || !near(x, y, h * 0.35))) add({ x, y });
+    const ok = (x, y) => inRing(x, y, ring) && distToRing(x, y, ring) > h * 0.5 && (!extraPts.length || !near(x, y, h * 0.35));
+    if (opts.tolM > 0) adaptivePoints(ring, h, elevAt, opts.tolM, (x, y) => { if (ok(x, y)) add({ x, y }); });
+    else {
+      const [minx, miny, maxx, maxy] = bbox(ring);
+      let row = 0;
+      for (let y = miny + h * 0.5; y < maxy; y += h * 0.866, row++)
+        for (let x = minx + (row % 2 ? h * 0.75 : h * 0.25); x < maxx; x += h)
+          if (ok(x, y)) add({ x, y });
+    }
   }
   const N = P.length, coords = new Float64Array(N * 2);
   P.forEach((p, i) => { coords[i * 2] = p.x; coords[i * 2 + 1] = p.y; });

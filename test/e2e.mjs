@@ -179,6 +179,32 @@ const SCENARIOS = {
     })()`);
     check('Download 3MF produces a 3MF zip', !r.failed && info && info.zip && info.type === 'model/3mf', JSON.stringify(info));
   },
+  // Not run by default: compares the adaptive mesh with the old uniform grid on real places.
+  async measure() {
+    const places = [
+      ['Lake Thun (lake + mountains)', 46.6930, 7.7300, 12, {}],
+      ['Lake Thun with water (default)', 46.6930, 7.7300, 12, { water: true }],
+      ['Lake Thun, stepped', 46.6930, 7.7300, 12, { stepped: true, stepMm: 1 }],
+      ['Bernese Alps (steep)', 46.5586, 7.8357, 12, {}],
+      ['Netherlands polders (flat)', 52.3800, 4.8200, 12, {}]
+    ];
+    for (const [name, lat, lng, zoom, extra] of places) {
+      await setArea(lat, lng, zoom, { lTerrain: 1 });
+      const r = await evaluate(`(async () => {
+        const mc = window.__mapcast, ring = Object.values(mc.map._layers).find(l => l instanceof L.Polygon && l.options.className === 'shape-path').getLatLngs()[0].map(p => ({ lat: p.lat, lng: p.lng }));
+        const S = { ...mc.readSettings(), water: false, ...${JSON.stringify(extra)} };
+        const out = {};
+        for (const adaptive of [false, true]) {
+          const t0 = performance.now(), m = await Mapcast.buildModel(ring, { ...S, adaptive });
+          const tris = m.layers.reduce((s, l) => s + l.arr.length / 9, 0), solid = window.__checkSolid(m.layers[0].arr);
+          out[adaptive ? 'adaptive' : 'uniform'] = { tris, mb: +(tris * 50 / 1048576).toFixed(1), ms: Math.round(performance.now() - t0), open: solid.openEdges, nm: solid.nonManifoldEdges };
+        }
+        return out;
+      })()`);
+      const pct = Math.round(100 * r.adaptive.tris / r.uniform.tris);
+      check(`${name}: ${r.uniform.tris.toLocaleString()} → ${r.adaptive.tris.toLocaleString()} triangles (${pct}%), ${r.uniform.mb} → ${r.adaptive.mb} MB STL`, r.adaptive.open === 0 && r.adaptive.nm === 0, `build ${r.uniform.ms} → ${r.adaptive.ms} ms`);
+    }
+  },
   async cancel() {
     await setArea(46.5586, 7.8357, 11, { lTerrain: 1 });
     await evaluate(`document.querySelector('#detail button[data-v="0.4"]').click(), true`);
@@ -192,7 +218,7 @@ const SCENARIOS = {
   }
 };
 
-const wanted = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(SCENARIOS);
+const wanted = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(SCENARIOS).filter(s => s !== 'measure'); // measure: on request
 try {
   for (const name of wanted) {
     if (!SCENARIOS[name]) { check(`unknown scenario "${name}"`, false); continue; }

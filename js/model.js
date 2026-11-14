@@ -113,9 +113,13 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
   }
 
   /* ---------- terrain (+ water) per tile ---------- */
+  // Adaptive mesh: flat ground gets large triangles as long as the surface stays within ~7% of the
+  // mesh spacing of the true height (about 0.05 mm at Standard) — finer than a printer can show.
+  // S.adaptive === false keeps the old uniform grid (used to measure the saving).
+  const tolM = elev && h && S.adaptive !== false ? (h * 0.07) / (scale * S.exag) : 0;
   for (const [k, t] of tiles.entries()) {
     onStatus(tiled ? `Building terrain — tile ${t.name} (${k + 1} of ${tiles.length})…` : 'Building terrain…', lerp(P.terrain, k / tiles.length * 0.5)); await tick();
-    t.T = buildTerrain(t.ring, h, elevAt, extraPts);
+    t.T = buildTerrain(t.ring, h, elevAt, extraPts, { tolM });
   }
   const minE = Math.min(...tiles.map(t => t.T.minE)), maxE = Math.max(...tiles.map(t => t.T.maxE));
   const zOf = e => S.base + (e - minE) * scale * S.exag;

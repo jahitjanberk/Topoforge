@@ -18,7 +18,8 @@ function quantizer(m0, stepM) {
 // m0, stepM: as in quantizer. Returns forced mesh points [{x, y, force: true}] in straddling pairs.
 function contourPoints(ring, h, elevAt, m0, stepM, { gap = 0.04, maxPoints = 400000 } = {}) {
   const [x0, y0, x1, y1] = bbox(ring);
-  const c = h * 0.5; // grid spacing: about two samples per mesh triangle
+  // Contour sampling every 0.75h: sparser fails the crisp-wall test (test/steps.test.mjs).
+  const c = h * 0.75;
   const Gx = Math.ceil((x1 - x0) / c) + 1, Gy = Math.ceil((y1 - y0) / c) + 1;
   const V = new Float64Array(Gx * Gy);
   let lo = Infinity, hi = -Infinity;

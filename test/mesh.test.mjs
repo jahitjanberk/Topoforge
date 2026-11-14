@@ -80,3 +80,51 @@ test('binary STL has the right size and triangle count', async () => {
   assert.equal(buf.getUint32(80, true), 3);
   assert.equal(buf.getFloat32(84 + 8, true), 1, 'first normal should point +z');
 });
+
+// Height of the mesh's top surface at (x, y), by barycentric interpolation in the containing triangle.
+function meshHeightAt(T, zOf, x, y, cells) {
+  for (const t of cells.get(Math.floor(x / 4) + ',' + Math.floor(y / 4)) || []) {
+    const [a, b, c] = [T.keep[t], T.keep[t + 1], T.keep[t + 2]], A = T.P[a], B = T.P[b], C = T.P[c];
+    const d = (B.y - C.y) * (A.x - C.x) + (C.x - B.x) * (A.y - C.y);
+    const u = ((B.y - C.y) * (x - C.x) + (C.x - B.x) * (y - C.y)) / d, v = ((C.y - A.y) * (x - C.x) + (A.x - C.x) * (y - C.y)) / d, w = 1 - u - v;
+    if (u >= -1e-9 && v >= -1e-9 && w >= -1e-9) return u * zOf(T.E[a]) + v * zOf(T.E[b]) + w * zOf(T.E[c]);
+  }
+  return null;
+}
+function surfaceError(T, zOf, truth) {
+  const cells = new Map(); // 4 mm buckets of triangles by bounding box
+  for (let t = 0; t < T.keep.length; t += 3) {
+    const ps = [0, 1, 2].map(j => T.P[T.keep[t + j]]);
+    for (let i = Math.floor(Math.min(...ps.map(p => p.x)) / 4); i <= Math.floor(Math.max(...ps.map(p => p.x)) / 4); i++)
+      for (let j = Math.floor(Math.min(...ps.map(p => p.y)) / 4); j <= Math.floor(Math.max(...ps.map(p => p.y)) / 4); j++)
+        (cells.get(i + ',' + j) || cells.set(i + ',' + j, []).get(i + ',' + j)).push(t);
+  }
+  let max = 0, sq = 0, n = 0, seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let k = 0; k < 3000; k++) {
+    const x = -38 + 76 * rnd(), y = -38 + 76 * rnd(), z = meshHeightAt(T, zOf, x, y, cells);
+    if (z == null) continue;
+    const e = Math.abs(z - zOf(truth(x, y))); max = Math.max(max, e); sq += e * e; n++;
+  }
+  return { max, rms: Math.sqrt(sq / n), n };
+}
+
+test('adaptive mesh: far fewer triangles on flat ground, same accuracy', () => {
+  // Plains and a high plateau (flat), a detailed hill, and a ridge between them.
+  const land = (x, y) => {
+    const hill = 120 * Math.exp(-((x + 15) ** 2 + (y - 10) ** 2) / 120) * (1 + 0.15 * Math.sin(x * 1.3) * Math.cos(y * 1.1));
+    const plateau = 80 / (1 + Math.exp(-(x - 15) / 0.8)); // steep (~2 mm wide) but continuous, like real DEM data
+    return 20 + hill + plateau + 10 * Math.sin(y / 6) * Math.exp(-((x - 5) ** 2) / 40);
+  };
+  const ring = square(40), h = 0.7, scale = 0.2, tolMm = h * 0.07;
+  const zOf = e => BASE + e * scale;
+  const uniform = buildTerrain(ring, h, land), adaptive = buildTerrain(ring, h, land, [], { tolM: tolMm / scale });
+  assertSolid(terrainSolid(adaptive, zOf), 'adaptive terrain');
+  const nU = uniform.keep.length / 3, nA = adaptive.keep.length / 3;
+  const eU = surfaceError(uniform, zOf, land), eA = surfaceError(adaptive, zOf, land);
+  console.log(`    uniform ${nU} triangles, max error ${eU.max.toFixed(3)} mm, rms ${eU.rms.toFixed(4)} mm`);
+  console.log(`    adaptive ${nA} triangles (${(100 * nA / nU).toFixed(0)}%), max error ${eA.max.toFixed(3)} mm, rms ${eA.rms.toFixed(4)} mm`);
+  assert.ok(nA < nU * 0.6, `expected at least 40% fewer triangles: ${nA} vs ${nU}`);
+  assert.ok(eA.max < eU.max + tolMm, `adaptive max error ${eA.max.toFixed(3)} mm vs uniform ${eU.max.toFixed(3)} mm`);
+  assert.ok(eA.rms < eU.rms * 1.25, `adaptive rms error ${eA.rms.toFixed(4)} mm vs uniform ${eU.rms.toFixed(4)} mm`);
+});
