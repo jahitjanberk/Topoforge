@@ -3,7 +3,7 @@
    here is the relief you will print. MapLibre is loaded lazily the first time 3D opens. */
 (() => {
 'use strict';
-const Mapcast = window.Mapcast = window.Mapcast || {};
+const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
 
 const { TERRARIUM_URL } = Mapcast;
 const { OSM } = Mapcast;

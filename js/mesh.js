@@ -1,11 +1,11 @@
 /* Mesh building (all units mm, z up). Uses the global Delaunator and earcut libraries. */
 (() => {
 'use strict';
-const Mapcast = window.Mapcast = window.Mapcast || {};
+const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
 
 const { bbox, inRing, distToRing, signedArea } = Mapcast;
 
-const earcut = (window.earcut && window.earcut.default) || window.earcut;
+const earcut = (globalThis.earcut && globalThis.earcut.default) || globalThis.earcut;
 
 // earcut emits every triangle with the same winding; read it from the summed area so
 // zero-area slivers along straight edges are never flipped on rounding noise.

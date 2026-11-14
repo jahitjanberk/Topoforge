@@ -1,7 +1,7 @@
 /* Binary STL export + file download */
 (() => {
 'use strict';
-const Mapcast = window.Mapcast = window.Mapcast || {};
+const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
 
 function toSTL(arrs) {
   const n = arrs.reduce((s, a) => s + a.length / 9, 0);

@@ -2,7 +2,7 @@
    loaded on first use with a dynamic import (resolved through the import map in index.html). */
 (() => {
 'use strict';
-const Mapcast = window.Mapcast = window.Mapcast || {};
+const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
 
 const { $, $$ } = Mapcast;
 const { toSTL, download } = Mapcast;

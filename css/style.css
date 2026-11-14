@@ -78,6 +78,10 @@ details.adv .inner{padding-top:10px}
 .primary{width:100%;border:0;background:var(--accent);color:#fff;font-weight:600;font-size:14.5px;border-radius:11px;padding:12px;display:flex;align-items:center;justify-content:center;gap:8px;transition:.12s}
 .primary:hover{background:var(--accent-d)}
 .primary:disabled{background:#d6d3d1;cursor:not-allowed}
+.primary.cancel{background:var(--ink)}
+.primary.cancel:hover{background:var(--ink2)}
+.progress{height:4px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:9px}
+.progress i{display:block;height:100%;width:0;background:var(--accent);border-radius:inherit;transition:width .25s ease}
 #status{font-size:12.5px;margin-top:9px;color:var(--ink2);display:flex;gap:8px;align-items:flex-start;line-height:1.45;min-height:18px}
 #status.err{color:var(--err)}
 .spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:spin .8s linear infinite;flex:none;margin-top:2px}

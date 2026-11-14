@@ -22,7 +22,9 @@ js/
   app.js          entry point: map, drawing tools, search, settings, persistence
   basemaps.js     OpenStreetMap layer + relief shading computed from elevation tiles
   terrain3d.js    3D terrain view (MapLibre GL, lazy-loaded)
-  model.js        print area + settings → mesh layers
+  generator.js    runs model generation in a Web Worker (progress, cancel)
+  worker.js       the Web Worker: loads geo/data/mesh/model and builds the model
+  model.js        print area + settings → mesh layers (no DOM; runs in the worker)
   mesh.js         terrain / building / road mesh builders
   data.js         elevation tiles + OpenStreetMap (Overpass) download
   geo.js          projection and 2D geometry helpers

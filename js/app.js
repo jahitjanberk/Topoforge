@@ -2,13 +2,13 @@
    This module wires up the UI: map, drawing tools, search, settings and persistence. */
 (() => {
 'use strict';
-const Mapcast = window.Mapcast = window.Mapcast || {};
+const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
 
 const { $, $$ } = Mapcast;
 const { D2R, toLocal, fromLocal, rot, fmtLen, fmtArea, signedArea, bbox, cleanRing, simplifyDP } = Mapcast;
 const { osmLayer, reliefLayer } = Mapcast;
 const { createTerrainView } = Mapcast;
-const { buildModel } = Mapcast;
+const { createGenerator } = Mapcast;
 const { showPreview, closePreview, isPreviewOpen } = Mapcast;
 const { toSTL, download } = Mapcast;
 
@@ -19,6 +19,7 @@ const state = { tool: 'select', shape: null, place: '', relief: true, view3d: fa
 const keys = { shift: false, alt: false, space: false };
 const history = [];
 let busy = false;
+const generator = createGenerator(); // builds models in a Web Worker
 
 const mpp = lat => 40075016.686 * Math.cos(lat * D2R) / 2 ** (map.getZoom() + 8);
 
@@ -463,7 +464,7 @@ let areaPanelType = null;
 function numInput(id, label, unit) { return `<label>${label}<div class="unit"><input id="${id}" type="number" step="any" min="0" inputmode="decimal"><i>${unit}</i></div></label>`; }
 function updateAreaPanel() {
   const el = $('#areaInfo'), s = state.shape;
-  $('#generate').disabled = !s || busy;
+  $('#generate').disabled = busy ? !generator.cancellable : !s;
   if (!s) {
     if (areaPanelType !== 'none') { el.innerHTML = '<p class="empty">Choose a tool, then draw on the map. Tip: a single click drops a ready-sized shape you can then drag and resize.</p>'; areaPanelType = 'none'; }
     return;
@@ -603,24 +604,43 @@ map.on('moveend', save);
 /* =====================================================================
    Generate
    ===================================================================== */
-function setStatus(msg, kind) {
-  const el = $('#status'); el.className = kind === 'err' ? 'err' : '';
-  el.innerHTML = msg ? (kind === 'busy' ? '<div class="spin"></div>' : '') + `<span>${msg}</span>` : '';
+let statusShown = '';
+// frac: 0–1 fills the progress bar; omit it to hide the bar.
+function setStatus(msg, kind, frac) {
+  const el = $('#status');
+  if (kind === 'busy' && msg === statusShown && el.querySelector('.spin')) { /* same text: only move the bar */ }
+  else {
+    el.className = kind === 'err' ? 'err' : '';
+    el.innerHTML = msg ? (kind === 'busy' ? '<div class="spin"></div>' : '') + `<span>${msg}</span>` : '';
+    statusShown = kind === 'busy' ? msg : '';
+  }
+  const bar = $('#progress'), show = kind === 'busy' && typeof frac === 'number';
+  bar.classList.toggle('hidden', !show);
+  if (show) bar.firstElementChild.style.width = `${Math.round(Math.max(0, Math.min(1, frac)) * 100)}%`;
+}
+const GEN_LABEL = $('#generate').innerHTML;
+const CANCEL_LABEL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>Cancel';
+function setBusy(on) {
+  busy = on;
+  const btn = $('#generate');
+  btn.innerHTML = on && generator.cancellable ? CANCEL_LABEL : GEN_LABEL;
+  btn.classList.toggle('cancel', on);
+  updateAreaPanel();
 }
 let lastModel = null;
-$('#generate').onclick = generate;
+$('#generate').onclick = () => busy ? generator.cancel() : generate();
 async function generate() {
   if (!state.shape || busy) return;
-  busy = true; $('#generate').disabled = true;
+  setBusy(true);
   try {
-    const result = await buildModel(shapeRing(state.shape, 256), readSettings(), msg => setStatus(msg, 'busy'));
+    const result = await generator.run(shapeRing(state.shape, 256), readSettings(), (msg, frac) => setStatus(msg, 'busy', frac));
     lastModel = { ...result, name: slug() };
     await showPreview(lastModel);
     setStatus(['Model ready.', ...result.notes].join(' '));
   } catch (err) {
-    console.error(err);
-    setStatus(err.message || String(err), 'err');
-  } finally { busy = false; updateAreaPanel(); }
+    if (err && err.cancelled) setStatus('Cancelled.');
+    else { console.error(err); setStatus(err.message || String(err), 'err'); }
+  } finally { setBusy(false); }
 }
 $('#dlAll').onclick = () => lastModel && download(toSTL(lastModel.layers.map(l => l.arr)), lastModel.name + '.stl');
 $('#pvClose').onclick = closePreview; $('#pvBack').onclick = closePreview;

@@ -1,19 +1,24 @@
-/* Turns a print area + settings into printable mesh layers. No DOM access: progress is
-   reported through onStatus(message). */
+/* Turns a print area + settings into printable mesh layers. No DOM or Leaflet access, so it
+   runs inside the model Web Worker (js/worker.js) as well as on the page. Progress is reported
+   through onStatus(message, fraction 0–1). */
 (() => {
 'use strict';
-const Mapcast = window.Mapcast = window.Mapcast || {};
+const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
 
-const { toLocal, fromLocal, bbox, cleanRing, signedArea, inRing, distToRing } = Mapcast;
+const { Bounds, toLocal, fromLocal, bbox, cleanRing, signedArea, inRing, distToRing } = Mapcast;
 const { loadElevation, fetchOverpass, parseOSM, buildingHeight, ROADS, PATHS } = Mapcast;
 const { buildTerrain, terrainSolid, addPrism, addRoadBox } = Mapcast;
 
 const tick = () => new Promise(r => setTimeout(r, 16));
 
-// ringLL: [L.LatLng] outline of the print area. S: settings from readSettings().
+// Share of the progress bar each stage covers.
+const P = { download: [0, 0.4], terrain: 0.45, buildings: [0.7, 0.85], roads: [0.85, 0.97], done: 0.98 };
+const lerp = ([a, b], f) => a + (b - a) * f;
+
+// ringLL: [{lat,lng}] outline of the print area. S: settings from readSettings().
 // Returns { layers: [{id,name,color,arr}], stats: [[label,value]], notes: [string] }.
 async function buildModel(ringLL, S, onStatus = () => {}) {
-  const bounds = L.latLngBounds(ringLL), o = bounds.getCenter();
+  const bounds = Bounds.of(ringLL), o = bounds.getCenter();
   const ringM = ringLL.map(ll => toLocal(ll, o));
   const [minx, miny, maxx, maxy] = bbox(ringM);
   const scale = S.size / Math.max(maxx - minx, maxy - miny); // mm per metre
@@ -23,14 +28,15 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
   const m2ll = (x, y) => fromLocal({ x: x / scale + cx, y: y / scale + cy }, o);
   const ll2m = (lat, lng) => { const p = toLocal({ lat, lng }, o); return { x: (p.x - cx) * scale, y: (p.y - cy) * scale }; };
 
-  onStatus(S.terrain && (S.buildings || S.roads) ? 'Downloading elevation and OpenStreetMap data…' : S.terrain ? 'Downloading elevation data…' : (S.buildings || S.roads) ? 'Downloading OpenStreetMap data…' : 'Building model…');
+  const dlMsg = S.terrain && (S.buildings || S.roads) ? 'Downloading elevation and OpenStreetMap data…' : S.terrain ? 'Downloading elevation data…' : (S.buildings || S.roads) ? 'Downloading OpenStreetMap data…' : 'Building model…';
+  onStatus(dlMsg, 0);
   const [elev, osmJs] = await Promise.all([
-    S.terrain ? loadElevation(bounds.pad(0.05)) : null,
+    S.terrain ? loadElevation(bounds.pad(0.05), f => onStatus(dlMsg, lerp(P.download, f))) : null,
     S.buildings || S.roads ? fetchOverpass(bounds.pad(0.01), S) : null
   ]);
   const osm = osmJs ? parseOSM(osmJs) : { buildings: [], roads: [] };
 
-  onStatus('Building terrain…'); await tick();
+  onStatus('Building terrain…', P.terrain); await tick();
   const elevAt = elev ? (x, y) => { const ll = m2ll(x, y); const e = elev.sample(ll.lat, ll.lng); return S.sea ? Math.max(e, 0) : e; } : () => 0;
   let h = null;
   if (elev) {
@@ -44,8 +50,10 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
 
   let buildings = [], nB = 0;
   if (S.buildings && osm.buildings.length) {
-    onStatus(`Raising ${osm.buildings.length.toLocaleString()} buildings…`); await tick();
-    for (const bd of osm.buildings) {
+    const bMsg = `Raising ${osm.buildings.length.toLocaleString()} buildings…`;
+    onStatus(bMsg, P.buildings[0]); await tick();
+    for (const [i, bd] of osm.buildings.entries()) {
+      if (i % 500 === 0) onStatus(bMsg, lerp(P.buildings, i / osm.buildings.length));
       let outer = cleanRing(bd.outer.map(p => ll2m(p.lat, p.lon)), 0.02);
       if (outer.length < 3 || Math.abs(signedArea(outer)) < 0.15) continue;
       if (!outer.every(p => inRing(p.x, p.y, ring))) continue;
@@ -57,9 +65,10 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
   }
   let roads = [], nR = 0;
   if (S.roads && osm.roads.length) {
-    onStatus('Laying roads…'); await tick();
+    onStatus('Laying roads…', P.roads[0]); await tick();
     const piece = elev ? Math.max(1.2, (h || 1) * 1.5) : 4;
-    for (const rd of osm.roads) {
+    for (const [ri, rd] of osm.roads.entries()) {
+      if (ri % 500 === 0) onStatus('Laying roads…', lerp(P.roads, ri / osm.roads.length));
       const t = rd.tags; if (t.tunnel && t.tunnel !== 'no') continue;
       const spec = ROADS[t.highway] || (S.paths ? PATHS[t.highway] : null); if (!spec) continue;
       const w = Math.max(spec[0] * scale, S.roadMin * spec[1]);
@@ -82,7 +91,7 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
     }
   }
 
-  onStatus('Preparing preview…'); await tick();
+  onStatus('Preparing preview…', P.done); await tick();
   const layers = [
     { id: 'terrain', name: S.terrain ? 'Terrain & base' : 'Base', color: '#e3d3b0', arr: new Float32Array(terrain) },
     { id: 'buildings', name: 'Buildings', color: '#fbfaf8', arr: new Float32Array(buildings) },

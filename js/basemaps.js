@@ -2,7 +2,7 @@
    AWS Terrarium elevation tiles the STL export uses. Shared by the 2D and 3D views. */
 (() => {
 'use strict';
-const Mapcast = window.Mapcast = window.Mapcast || {};
+const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
 
 const { TERRARIUM_URL } = Mapcast;
 

@@ -1,12 +1,26 @@
 /* Geo helpers — local equirectangular metres around an origin, plus 2D geometry utilities.
-   Relies on the global Leaflet `L` (loaded as a classic script before the modules). */
+   Works without Leaflet (e.g. in the model Web Worker); returns L.LatLng objects when it is loaded. */
 (() => {
 'use strict';
-const Mapcast = window.Mapcast = window.Mapcast || {};
+const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
 
 const R = 6378137, D2R = Math.PI / 180;
 const toLocal = (ll, o) => ({ x: (ll.lng - o.lng) * D2R * R * Math.cos(o.lat * D2R), y: (ll.lat - o.lat) * D2R * R });
-const fromLocal = (p, o) => L.latLng(o.lat + p.y / R / D2R, o.lng + p.x / (R * Math.cos(o.lat * D2R)) / D2R);
+const latLng = (lat, lng) => typeof L !== 'undefined' ? L.latLng(lat, lng) : { lat, lng };
+const fromLocal = (p, o) => latLng(o.lat + p.y / R / D2R, o.lng + p.x / (R * Math.cos(o.lat * D2R)) / D2R);
+
+// Lat/lng bounding box with the subset of Leaflet's LatLngBounds API the model code uses.
+class Bounds {
+  constructor(s, w, n, e) { this.s = s; this.w = w; this.n = n; this.e = e; }
+  static of(points) {
+    let s = Infinity, w = Infinity, n = -Infinity, e = -Infinity;
+    for (const p of points) { if (p.lat < s) s = p.lat; if (p.lat > n) n = p.lat; if (p.lng < w) w = p.lng; if (p.lng > e) e = p.lng; }
+    return new Bounds(s, w, n, e);
+  }
+  getSouth() { return this.s; } getWest() { return this.w; } getNorth() { return this.n; } getEast() { return this.e; }
+  getCenter() { return { lat: (this.s + this.n) / 2, lng: (this.w + this.e) / 2 }; }
+  pad(r) { const h = (this.n - this.s) * r, w = (this.e - this.w) * r; return new Bounds(this.s - h, this.w - w, this.n + h, this.e + w); }
+}
 const rot = (p, a) => ({ x: p.x * Math.cos(a) - p.y * Math.sin(a), y: p.x * Math.sin(a) + p.y * Math.cos(a) });
 const fmtLen = m => m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(m < 10000 ? 2 : 1)} km`;
 const fmtArea = a => a < 1e6 ? `${Math.round(a).toLocaleString()} m²` : `${(a / 1e6).toFixed(a < 1e8 ? 2 : 0)} km²`;
@@ -56,5 +70,5 @@ function tileXY(lat, lng, z) {
   return { x: (lng + 180) / 360 * n, y: (1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2 * n };
 }
 
-Object.assign(Mapcast, { R, toLocal, fromLocal, rot, fmtLen, fmtArea, signedArea, inRing, distToRing, bbox, cleanRing, simplifyDP, tileXY, D2R });
+Object.assign(Mapcast, { R, Bounds, toLocal, fromLocal, rot, fmtLen, fmtArea, signedArea, inRing, distToRing, bbox, cleanRing, simplifyDP, tileXY, D2R });
 })();

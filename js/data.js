@@ -1,13 +1,25 @@
 /* Data sources: elevation (AWS Terrarium tiles) + OpenStreetMap (Overpass) */
 (() => {
 'use strict';
-const Mapcast = window.Mapcast = window.Mapcast || {};
+const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
 
 const { D2R, tileXY, inRing } = Mapcast;
 
 const TERRARIUM_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
 
-async function loadElevation(b) {
+// Decodes one tile without the DOM, so this also runs inside a Web Worker.
+async function fetchBitmap(url) {
+  const r = await fetch(url, { mode: 'cors' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return createImageBitmap(await r.blob());
+}
+const makeCanvas = (w, h) => {
+  if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, h);
+  const c = document.createElement('canvas'); c.width = w; c.height = h; return c;
+};
+
+// b: Bounds (see geo.js). onProgress(fraction 0–1) as tiles arrive.
+async function loadElevation(b, onProgress = () => {}) {
   let z, x0, x1, y0, y1;
   for (z = 15; z >= 1; z--) {
     const a = tileXY(b.getNorth(), b.getWest(), z), c = tileXY(b.getSouth(), b.getEast(), z);
@@ -15,19 +27,17 @@ async function loadElevation(b) {
     if ((x1 - x0 + 1) * (y1 - y0 + 1) <= 36) break;
   }
   const W = (x1 - x0 + 1) * 256, H = (y1 - y0 + 1) * 256;
-  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const cv = makeCanvas(W, H);
   const ctx = cv.getContext('2d', { willReadFrequently: true });
   ctx.fillStyle = 'rgb(128,0,0)'; ctx.fillRect(0, 0, W, H); // = 0 m
-  let failed = 0;
-  const jobs = [];
+  let failed = 0, done = 0;
+  const jobs = [], n = 2 ** z;
   for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
-    jobs.push(new Promise(res => {
-      const img = new Image(); img.crossOrigin = 'anonymous';
-      img.onload = () => { ctx.drawImage(img, (x - x0) * 256, (y - y0) * 256); res(); };
-      img.onerror = () => { failed++; res(); };
-      const n = 2 ** z;
-      img.src = TERRARIUM_URL.replace('{z}', z).replace('{x}', ((x % n) + n) % n).replace('{y}', y);
-    }));
+    const url = TERRARIUM_URL.replace('{z}', z).replace('{x}', ((x % n) + n) % n).replace('{y}', y);
+    jobs.push(fetchBitmap(url)
+      .then(bmp => { ctx.drawImage(bmp, (x - x0) * 256, (y - y0) * 256); bmp.close(); })
+      .catch(() => { failed++; })
+      .finally(() => onProgress(++done / jobs.length)));
   }
   await Promise.all(jobs);
   if (failed === jobs.length) throw new Error('Could not download elevation data. Check your connection, or untick Terrain.');
