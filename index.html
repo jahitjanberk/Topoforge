@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapcast — turn any place into a 3D print</title>
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<div id="app">
+  <aside id="panel">
+    <div id="panelScroll">
+      <header class="brand">
+        <div class="logo">
+          <img src="img/logo.svg" width="22" height="22" alt="">
+        </div>
+        <div><h1>Mapcast</h1><p>Turn any place into a 3D print</p></div>
+      </header>
+
+      <section class="card">
+        <div class="step"><span>1</span>Find a place</div>
+        <div class="search">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+          <input id="q" placeholder="City, address, or 51.51, -0.09" autocomplete="off" spellcheck="false">
+          <ul id="results"></ul>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="step"><span>2</span>Draw your print area</div>
+        <div class="toolgrid">
+          <button data-tool="square" title="Square (S)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="1"/></svg>Square<kbd>S</kbd></button>
+          <button data-tool="rect" title="Rectangle (R)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="10" rx="1"/></svg>Rectangle<kbd>R</kbd></button>
+          <button data-tool="circle" title="Circle (C)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/></svg>Circle<kbd>C</kbd></button>
+          <button data-tool="pen" title="Pen (P)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18z"/><path d="M2 2l7.6 7.6"/><circle cx="11" cy="11" r="2"/></svg>Pen<kbd>P</kbd></button>
+        </div>
+        <button class="ghost" id="useView">Or use the current map view</button>
+        <div id="areaInfo"></div>
+      </section>
+
+      <section class="card">
+        <div class="step"><span>3</span>Model settings</div>
+        <div class="field">
+          <div class="lab">Include</div>
+          <div class="chips">
+            <label class="chip" style="--dot:#d9c7a3"><input type="checkbox" id="lTerrain" checked><span>Terrain</span></label>
+            <label class="chip" style="--dot:#ffffff"><input type="checkbox" id="lBuildings" checked><span>Buildings</span></label>
+            <label class="chip" style="--dot:#9ca3af"><input type="checkbox" id="lRoads" checked><span>Roads</span></label>
+            <label class="chip" style="--dot:#9ca3af"><input type="checkbox" id="lPaths"><span>Footpaths</span></label>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lab"><span>Model size (longest side)</span><output id="oSize"></output></div>
+          <input type="range" id="sSize" min="40" max="300" step="5" value="150">
+        </div>
+        <div class="field">
+          <div class="lab"><span>Base thickness</span><output id="oBase"></output></div>
+          <input type="range" id="sBase" min="1" max="10" step="0.5" value="3">
+        </div>
+        <div class="field" id="fExag">
+          <div class="lab"><span>Terrain exaggeration</span><output id="oExag"></output></div>
+          <input type="range" id="sExag" min="0.5" max="10" step="0.1" value="1.5">
+        </div>
+        <div class="field">
+          <div class="lab"><span>Detail</span></div>
+          <div class="seg" id="detail">
+            <button data-v="1.2">Draft</button><button data-v="0.7" class="active">Standard</button><button data-v="0.4">Fine</button>
+          </div>
+        </div>
+        <details class="adv">
+          <summary>Advanced</summary>
+          <div class="inner">
+            <div class="field">
+              <div class="lab"><span>Building height ×</span><output id="oBH"></output></div>
+              <input type="range" id="sBH" min="0.5" max="5" step="0.1" value="1.5">
+            </div>
+            <div class="field">
+              <div class="lab"><span>Minimum building height</span><output id="oBMin"></output></div>
+              <input type="range" id="sBMin" min="0.2" max="3" step="0.1" value="0.8">
+            </div>
+            <div class="field">
+              <div class="lab"><span>Minimum road width</span><output id="oRW"></output></div>
+              <input type="range" id="sRW" min="0.4" max="2.5" step="0.1" value="0.8">
+            </div>
+            <div class="field">
+              <div class="lab"><span>Road height</span><output id="oRH"></output></div>
+              <input type="range" id="sRH" min="0.2" max="2" step="0.1" value="0.6">
+            </div>
+            <label class="check"><input type="checkbox" id="cSea" checked>Flatten sea floor to sea level</label>
+          </div>
+        </details>
+      </section>
+    </div>
+    <div class="genbar">
+      <button class="primary" id="generate" disabled>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M12 22V12M21 7l-9 5-9-5"/></svg>
+        Generate 3D model
+      </button>
+      <div id="status"></div>
+    </div>
+  </aside>
+
+  <main id="mapwrap">
+    <div id="map"></div>
+    <div class="maptools" id="maptools">
+      <button data-tool="select" data-tip="Move & edit (V)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 3l14 7-6.5 2L10 19z"/></svg></button>
+      <span class="div"></span>
+      <button data-tool="square" data-tip="Square (S)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="1"/></svg></button>
+      <button data-tool="rect" data-tip="Rectangle (R)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="10" rx="1"/></svg></button>
+      <button data-tool="circle" data-tip="Circle (C)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/></svg></button>
+      <button data-tool="pen" data-tip="Pen — click or drag (P)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18z"/><path d="M2 2l7.6 7.6"/><circle cx="11" cy="11" r="2"/></svg></button>
+      <span class="div"></span>
+      <button id="tbUndo" data-tip="Undo (Ctrl/⌘ Z)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 010 10h-3"/></svg></button>
+      <button id="tbDelete" data-tip="Delete area (Del)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+    </div>
+    <div class="basemap" id="basemap" role="group" aria-label="Map view">
+      <button id="relief" aria-pressed="true" title="Shade the map by elevation">Relief</button>
+      <span class="div"></span>
+      <button id="view3d" aria-pressed="false" title="3D terrain view (3)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M2 20l6-11 4 6 3-4 7 9z"/></svg>3D</button>
+    </div>
+    <div id="map3d" class="hidden"></div>
+    <div id="fileNotice" class="notice hidden" role="alert">
+      <b>The street map can't load when this page is opened as a file.</b>
+      OpenStreetMap only serves map tiles to web pages. Double-click <code>start.bat</code> in the Mapcast folder
+      (or run <code>npm start</code>), then use the page it opens at <code>http://localhost:8080</code>.
+    </div>
+    <div id="hint"></div>
+    <div id="cursorLabel" class="hidden"></div>
+  </main>
+</div>
+
+<div id="preview" class="hidden">
+  <div id="pvCanvas"><div class="pv-hint">Drag to orbit · Scroll to zoom · Right-drag to pan</div></div>
+  <aside class="pv-side">
+    <div class="pv-head"><h2>Your model</h2><button class="iconbtn" id="pvClose" title="Close">✕</button></div>
+    <dl class="stats" id="pvStats"></dl>
+    <button class="primary" id="dlAll">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>
+      Download STL
+    </button>
+    <div class="sectionlabel" id="partsLabel">Separate parts (multi-colour)</div>
+    <div class="parts" id="dlParts"></div>
+    <p class="small">For multi-colour printing, import all part files together into your slicer as one object and assign a filament to each part.</p>
+    <button class="ghost" id="pvBack">← Back to map</button>
+  </aside>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/delaunator@5.1.0/delaunator.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/earcut@3.2.4/dist/earcut.min.js"></script>
+<!-- Classic scripts (not ES modules) so the app also runs when opened straight from disk.
+     Each file adds its functions to window.Mapcast; order matters. -->
+<script src="js/dom.js"></script>
+<script src="js/geo.js"></script>
+<script src="js/data.js"></script>
+<script src="js/basemaps.js"></script>
+<script src="js/mesh.js"></script>
+<script src="js/stl.js"></script>
+<script src="js/model.js"></script>
+<script src="js/terrain3d.js"></script>
+<script src="js/preview.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

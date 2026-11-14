@@ -1,0 +1,9 @@
+{
+  "name": "mapcast",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Find a place and export its terrain as an STL for 3D printing.",
+  "scripts": {
+    "start": "node serve.js"
+  }
+}
