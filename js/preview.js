@@ -65,11 +65,15 @@ async function showPreview(model) {
     parts.innerHTML = model.tiles.map(t => {
       const ls = model.layers.map((l, i) => ({ l, i })).filter(x => x.l.tile === t.name);
       const chips = ls.length > 1 ? `<div class="tile-parts">${ls.map(({ l, i }) => `<button data-i="${i}" title="Download ${l.name}"><i style="background:${l.color}"></i>${partName(l)}</button>`).join('')}</div>` : '';
-      return `<div class="tile-row"><button data-tile="${t.name}"><b>${t.name === 'Label' ? 'Label plate' : 'Tile ' + t.name}</b><small>${mb(ls.map(x => x.l.arr))} MB</small></button>${chips}</div>`;
+      return `<div class="tile-row"><button data-tile="${t.name}"><b>${t.name === 'Label' ? 'Label plate' : 'Tile ' + t.name}</b><small>3MF</small></button>${chips}</div>`;
     }).join('');
-    $$('#dlParts [data-tile]').forEach(b => b.onclick = () => {
-      const ls = model.layers.filter(l => l.tile === b.dataset.tile);
-      download(toSTL(ls.map(l => l.arr)), `${model.name}-${b.dataset.tile.toLowerCase()}.stl`);
+    // A tile downloads as a 3MF (all its parts, coloured); the chips below give single-part STLs.
+    $$('#dlParts [data-tile]').forEach(b => b.onclick = async () => {
+      b.disabled = true;
+      try {
+        const title = model.title || model.name;
+        download(await Mapcast.to3MF(Mapcast.modelPieces(model, title, b.dataset.tile), { title }), `${model.name}-${b.dataset.tile.toLowerCase()}.3mf`);
+      } finally { b.disabled = false; }
     });
   } else {
     parts.innerHTML = model.layers.map((l, i) => `<button data-i="${i}"><i style="background:${l.color}"></i>${l.name}<small>${mb([l.arr])} MB</small></button>`).join('');
@@ -81,8 +85,8 @@ async function showPreview(model) {
   const hint = $('#partsLabel').nextElementSibling.nextElementSibling;
   hint.classList.toggle('hidden', !multi);
   hint.textContent = model.tiles
-    ? 'Each tile file holds all of that tile’s parts. For multi-colour, load a tile’s part files together in your slicer. “Download STL” above gives the whole model, assembled.'
-    : 'For multi-colour printing, import all part files together into your slicer as one object and assign a filament to each part.';
+    ? 'Each tile downloads as a 3MF with its parts and colours; the chips give single-part STLs. “Download 3MF” above has every tile in one file, each as its own object.'
+    : 'The 3MF above already holds these parts. Single-part STLs are here for slicers that need them: import them together as one object and give each part a filament.';
 }
 
 function isPreviewOpen() { return !$('#preview').classList.contains('hidden'); }

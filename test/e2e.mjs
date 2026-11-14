@@ -164,6 +164,21 @@ const SCENARIOS = {
     check('every tile part is watertight', partsOk(r.parts), `${Object.keys(r.parts).length} parts`);
     await screenshot('tiles.png');
   },
+  async threemf() {
+    // Download through the real button and inspect the file the page would save.
+    await setArea(46.6863, 7.8632, 14, { lTerrain: 1, lWater: 1 });
+    const r = await generate();
+    const info = await evaluate(`(async () => {
+      let blob = null; const orig = URL.createObjectURL; URL.createObjectURL = b => { blob = b; return orig.call(URL, b); };
+      document.querySelector('#dl3mf').click();
+      for (let i = 0; i < 100 && !blob; i++) await new Promise(r => setTimeout(r, 100));
+      URL.createObjectURL = orig;
+      if (!blob) return null;
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      return { type: blob.type, size: bytes.length, zip: bytes[0] === 0x50 && bytes[1] === 0x4b };
+    })()`);
+    check('Download 3MF produces a 3MF zip', !r.failed && info && info.zip && info.type === 'model/3mf', JSON.stringify(info));
+  },
   async cancel() {
     await setArea(46.5586, 7.8357, 11, { lTerrain: 1 });
     await evaluate(`document.querySelector('#detail button[data-v="0.4"]').click(), true`);

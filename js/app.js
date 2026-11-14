@@ -716,7 +716,7 @@ async function generate() {
   setBusy(true);
   try {
     const result = await generator.run(shapeRing(state.shape, 256), readSettings(), (msg, frac) => setStatus(msg, 'busy', frac));
-    lastModel = { ...result, name: slug() };
+    lastModel = { ...result, name: slug(), title: modelTitle() };
     await showPreview(lastModel);
     setStatus(['Model ready.', ...result.notes].join(' '));
   } catch (err) {
@@ -725,6 +725,15 @@ async function generate() {
   } finally { setBusy(false); }
 }
 $('#dlAll').onclick = () => lastModel && download(toSTL(lastModel.layers.map(l => l.arr)), lastModel.name + '.stl');
+$('#dl3mf').onclick = async () => {
+  if (!lastModel) return;
+  const btn = $('#dl3mf'); btn.disabled = true;
+  try { download(await Mapcast.to3MF(Mapcast.modelPieces(lastModel, modelTitle()), { title: modelTitle() }), lastModel.name + '.3mf'); }
+  catch (err) { console.error(err); setStatus('Could not create the 3MF file: ' + (err.message || err), 'err'); }
+  finally { btn.disabled = false; }
+};
+// Human-readable model name for 3MF objects: the place, else "Mapcast model".
+function modelTitle() { return state.place || ($('#tLabel').value.trim()) || 'Mapcast model'; }
 $('#pvClose').onclick = closePreview; $('#pvBack').onclick = closePreview;
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && isPreviewOpen()) closePreview(); });
 

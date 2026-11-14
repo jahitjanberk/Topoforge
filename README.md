@@ -39,6 +39,7 @@ js/
   gpx.js          GPX parser (tracks + routes) and route simplification
   label.js        text → traced outlines for the raised label
   steps.js        stepped terrain: height rounding + contour point pairs
+  threemf.js      3MF export (zip + model XML, coloured parts)
   mesh.js         terrain / water / building / road mesh builders
   data.js         elevation tiles + OpenStreetMap (Overpass) download
   geo.js          projection and 2D geometry helpers
@@ -56,6 +57,14 @@ js/
 ## GPX routes
 
 **Import a GPX route…** in step 2, or drop a `.gpx` file on the map. Track segments and routes are read; waypoints are ignored. The route is drawn on the 2D map and in the 3D view, and the print area is fitted around it unless it's already inside one. In the model it becomes a raised strip that follows the terrain, as its own `*-route.stl` part. Width and height are under Advanced.
+
+## Downloads
+
+- **Download 3MF** (main button): one file with every part named and coloured, grouped as one object (or one object per tile). Slicers that read 3MF components and base-material colours (PrusaSlicer, Bambu Studio, OrcaSlicer, Cura) open it ready for multi-colour printing.
+- **Download STL**: the whole model as one single-colour STL.
+- **Parts / tiles list**: single-part STLs, and with tiles, one 3MF per tile.
+
+The 3MF writer (`js/threemf.js`) needs no library: it builds the XML with shared vertices and writes the zip itself, compressing with the browser's `CompressionStream`.
 
 ## Tiles
 
