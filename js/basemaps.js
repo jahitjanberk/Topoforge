@@ -2,9 +2,9 @@
    AWS Terrarium elevation tiles the STL export uses. Shared by the 2D and 3D views. */
 (() => {
 'use strict';
-const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
+const Topoforge = globalThis.Topoforge = globalThis.Topoforge || {};
 
-const { TERRARIUM_URL } = Mapcast;
+const { TERRARIUM_URL } = Topoforge;
 
 const OSM = {
   url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -55,5 +55,5 @@ const ReliefLayer = L.GridLayer.extend({
 });
 const reliefLayer = () => new ReliefLayer({ maxNativeZoom: 15, maxZoom: 20, opacity: 0.55, className: 'hillshade-layer', attribution: DEM_ATTR });
 
-Object.assign(Mapcast, { OSM, osmLayer, reliefLayer });
+Object.assign(Topoforge, { OSM, osmLayer, reliefLayer });
 })();

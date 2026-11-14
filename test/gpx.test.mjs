@@ -1,9 +1,9 @@
 // Unit tests for the GPX parser (no network).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadMapcast } from './load.mjs';
+import { loadTopoforge } from './load.mjs';
 
-const { parseGPX, haversineKm } = loadMapcast();
+const { parseGPX, haversineKm } = loadTopoforge();
 
 const GPX = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="test" xmlns="http://www.topografix.com/GPX/1/1">
@@ -37,7 +37,7 @@ test('round trips (start = end) keep their shape when simplified', () => {
 });
 
 test('model-space simplification keeps closed loops (simplifyDP)', () => {
-  const { simplifyDP } = loadMapcast();
+  const { simplifyDP } = loadTopoforge();
   const loop = Array.from({ length: 41 }, (_, i) => ({ x: 10 * Math.cos(i / 40 * 2 * Math.PI), y: 10 * Math.sin(i / 40 * 2 * Math.PI) }));
   assert.ok(simplifyDP(loop, 0.05).length > 10);
 });

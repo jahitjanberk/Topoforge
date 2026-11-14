@@ -2,7 +2,7 @@
    Works without Leaflet (e.g. in the model Web Worker); returns L.LatLng objects when it is loaded. */
 (() => {
 'use strict';
-const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
+const Topoforge = globalThis.Topoforge = globalThis.Topoforge || {};
 
 const R = 6378137, D2R = Math.PI / 180;
 const toLocal = (ll, o) => ({ x: (ll.lng - o.lng) * D2R * R * Math.cos(o.lat * D2R), y: (ll.lat - o.lat) * D2R * R });
@@ -99,5 +99,5 @@ function tileXY(lat, lng, z) {
   return { x: (lng + 180) / 360 * n, y: (1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2 * n };
 }
 
-Object.assign(Mapcast, { R, Bounds, toLocal, fromLocal, rot, fmtLen, fmtArea, signedArea, inRing, distToRing, bbox, cleanRing, simplifyDP, clipPolygonRect, rectContains, rectsOverlap, tileXY, D2R });
+Object.assign(Topoforge, { R, Bounds, toLocal, fromLocal, rot, fmtLen, fmtArea, signedArea, inRing, distToRing, bbox, cleanRing, simplifyDP, clipPolygonRect, rectContains, rectsOverlap, tileXY, D2R });
 })();

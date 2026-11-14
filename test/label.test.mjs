@@ -2,10 +2,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { loadMapcast } from './load.mjs';
+import { loadTopoforge } from './load.mjs';
 import { checkSolid, isWatertight } from './solid.mjs';
 
-const { traceMask, loopsToPolygons, signedArea, addPrism } = loadMapcast();
+const { traceMask, loopsToPolygons, signedArea, addPrism } = loadTopoforge();
 
 const maskFrom = rows => {
   const h = rows.length, w = rows[0].length, m = new Uint8Array(w * h);

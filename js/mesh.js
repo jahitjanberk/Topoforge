@@ -1,9 +1,9 @@
 /* Mesh building (all units mm, z up). Uses the global Delaunator and earcut libraries. */
 (() => {
 'use strict';
-const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
+const Topoforge = globalThis.Topoforge = globalThis.Topoforge || {};
 
-const { bbox, inRing, distToRing, signedArea, cleanRing, clipPolygonRect, rectContains } = Mapcast;
+const { bbox, inRing, distToRing, signedArea, cleanRing, clipPolygonRect, rectContains } = Topoforge;
 
 const earcut = (globalThis.earcut && globalThis.earcut.default) || globalThis.earcut;
 
@@ -418,5 +418,5 @@ function addRoadBox(o, a, b, w, zAt, roadH, clipRect = null) {
   return true;
 }
 
-Object.assign(Mapcast, { earcutWinding, pushTri, buildTerrain, terrainSolid, refineWater, splitWater, addPrism, addDrapedPrism, addRoadBox });
+Object.assign(Topoforge, { earcutWinding, pushTri, buildTerrain, terrainSolid, refineWater, splitWater, addPrism, addDrapedPrism, addRoadBox });
 })();

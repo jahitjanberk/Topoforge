@@ -1,12 +1,12 @@
 /* Binary STL export + file download */
 (() => {
 'use strict';
-const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
+const Topoforge = globalThis.Topoforge = globalThis.Topoforge || {};
 
 function toSTL(arrs) {
   const n = arrs.reduce((s, a) => s + a.length / 9, 0);
   const buf = new ArrayBuffer(84 + n * 50), dv = new DataView(buf);
-  const head = 'Mapcast STL - map data (c) OpenStreetMap contributors; elevation: Mapzen/AWS';
+  const head = 'Topoforge STL - map data (c) OpenStreetMap contributors; elevation: Mapzen/AWS';
   for (let i = 0; i < 80; i++) dv.setUint8(i, i < head.length ? head.charCodeAt(i) & 0x7f : 32);
   dv.setUint32(80, n, true);
   let off = 84;
@@ -25,5 +25,5 @@ function download(blob, name) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
-Object.assign(Mapcast, { toSTL, download });
+Object.assign(Topoforge, { toSTL, download });
 })();

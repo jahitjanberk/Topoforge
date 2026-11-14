@@ -2,10 +2,10 @@
    loaded on first use with a dynamic import (resolved through the import map in index.html). */
 (() => {
 'use strict';
-const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
+const Topoforge = globalThis.Topoforge = globalThis.Topoforge || {};
 
-const { $, $$ } = Mapcast;
-const { toSTL, download } = Mapcast;
+const { $, $$ } = Topoforge;
+const { toSTL, download } = Topoforge;
 
 let THREE = null, OrbitControls = null;
 async function loadThree() {
@@ -118,7 +118,7 @@ async function showPreview(model) {
       b.disabled = true;
       try {
         const title = model.title || model.name;
-        download(await Mapcast.to3MF(Mapcast.modelPieces(model, title, b.dataset.tile), { title }), `${model.name}-${b.dataset.tile.toLowerCase()}.3mf`);
+        download(await Topoforge.to3MF(Topoforge.modelPieces(model, title, b.dataset.tile), { title }), `${model.name}-${b.dataset.tile.toLowerCase()}.3mf`);
       } finally { b.disabled = false; }
     });
   } else {
@@ -143,5 +143,5 @@ function closePreview() {
   returnFocus = null;
 }
 
-Object.assign(Mapcast, { showPreview, isPreviewOpen, closePreview, openModal, modalProgress, modalError });
+Object.assign(Topoforge, { showPreview, isPreviewOpen, closePreview, openModal, modalProgress, modalError });
 })();

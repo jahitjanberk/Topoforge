@@ -4,7 +4,7 @@
    Works in browsers and in Node 18+. */
 (() => {
 'use strict';
-const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
+const Topoforge = globalThis.Topoforge = globalThis.Topoforge || {};
 
 /* ---------- zip ---------- */
 const CRC_TABLE = (() => {
@@ -96,7 +96,7 @@ function appendPart(m, arr, p1) {
 // each part's triangle range as a volume — that is how PrusaSlicer (and slicers derived from it)
 // store multi-part objects. With plain 3MF components instead, PrusaSlicer splits the parts into
 // separate objects and drops each onto the bed, losing their relative heights.
-async function to3MF(pieces, { title = 'Mapcast model' } = {}) {
+async function to3MF(pieces, { title = 'Topoforge model' } = {}) {
   const colors = [], colorIndex = new Map();
   for (const pc of pieces) for (const p of pc.parts) {
     const k = p.name + '|' + p.color;
@@ -124,7 +124,7 @@ async function to3MF(pieces, { title = 'Mapcast model' } = {}) {
 <model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:slic3rpe="http://schemas.slic3r.org/3mf/2017/06">
 <metadata name="slic3rpe:Version3mf">1</metadata>
 <metadata name="Title">${esc(title)}</metadata>
-<metadata name="Application">Mapcast</metadata>
+<metadata name="Application">Topoforge</metadata>
 <metadata name="Copyright">Map data © OpenStreetMap contributors; elevation: Mapzen / AWS Terrain Tiles</metadata>
 <resources>
 <basematerials id="1">${colors.map(p => `<base name="${esc(p.name)}" displaycolor="${hexColor(p.color)}"/>`).join('')}</basematerials>
@@ -152,5 +152,5 @@ function modelPieces(model, title, onlyTile = null) {
   }));
 }
 
-Object.assign(Mapcast, { to3MF, modelPieces, zip, crc32, meshXml });
+Object.assign(Topoforge, { to3MF, modelPieces, zip, crc32, meshXml });
 })();

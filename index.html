@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mapcast — turn any place into a 3D print</title>
+<title>Topoforge — turn any place into a 3D print</title>
 <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -25,7 +25,7 @@
         <div class="logo">
           <img src="img/logo.svg" width="22" height="22" alt="">
         </div>
-        <div><h1>Mapcast</h1><p>Turn any place into a 3D print</p></div>
+        <div><h1>Topoforge</h1><p>Turn any place into a 3D print</p></div>
       </header>
 
       <section class="card">
@@ -180,7 +180,7 @@
     <div id="map3d" class="hidden"></div>
     <div id="fileNotice" class="notice hidden" role="alert">
       <b>The street map can't load when this page is opened as a file.</b>
-      OpenStreetMap only serves map tiles to web pages. Double-click <code>start.bat</code> in the Mapcast folder
+      OpenStreetMap only serves map tiles to web pages. Double-click <code>start.bat</code> in the Topoforge folder
       (or run <code>npm start</code>), then use the page it opens at <code>http://localhost:8080</code>.
     </div>
     <div id="hint"></div>
@@ -226,7 +226,7 @@
 <script src="https://cdn.jsdelivr.net/npm/delaunator@5.1.0/delaunator.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/earcut@3.2.4/dist/earcut.min.js"></script>
 <!-- Classic scripts (not ES modules) so the app also runs when opened straight from disk.
-     Each file adds its functions to window.Mapcast; order matters. -->
+     Each file adds its functions to window.Topoforge; order matters. -->
 <script src="js/dom.js"></script>
 <script src="js/geo.js"></script>
 <script src="js/gpx.js"></script>

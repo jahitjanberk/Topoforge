@@ -3,9 +3,9 @@
    can't be cancelled and the page is busy while it runs. */
 (() => {
 'use strict';
-const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
+const Topoforge = globalThis.Topoforge = globalThis.Topoforge || {};
 
-const { buildModel } = Mapcast;
+const { buildModel } = Topoforge;
 
 class Cancelled extends Error {
   constructor() { super('Generation cancelled.'); this.cancelled = true; }
@@ -61,5 +61,5 @@ function createGenerator() {
   };
 }
 
-Object.assign(Mapcast, { createGenerator });
+Object.assign(Topoforge, { createGenerator });
 })();

@@ -1,9 +1,9 @@
 // Unit tests for OpenStreetMap parsing (no network).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadMapcast } from './load.mjs';
+import { loadTopoforge } from './load.mjs';
 
-const { parseOSM, assembleRings, areaFilter, Bounds } = loadMapcast();
+const { parseOSM, assembleRings, areaFilter, Bounds } = loadTopoforge();
 
 test('Overpass area filter: bounding box for rectangles, short polygon for circles', () => {
   const rect = [{ lat: 46, lng: 7 }, { lat: 46, lng: 8 }, { lat: 47, lng: 8 }, { lat: 47, lng: 7 }];
@@ -56,7 +56,7 @@ test('parseOSM: lake relation from split ways, with an island; river line; build
 });
 
 test('small map scales ask Overpass only for printable water', () => {
-  const { detailForScale } = loadMapcast();
+  const { detailForScale } = loadTopoforge();
   const city = detailForScale(20000, false), country = detailForScale(2e6, false);
   assert.equal(city.waterMinLength, 0);
   assert.equal(city.riverAreas, true);

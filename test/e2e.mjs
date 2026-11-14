@@ -31,7 +31,7 @@ const server = http.createServer((req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const APP = `http://127.0.0.1:${server.address().port}/`;
 
-const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'mapcast-e2e-'));
+const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'topoforge-e2e-'));
 const browser = spawn(BROWSER, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--enable-unsafe-swiftshader', '--use-angle=swiftshader', '--no-first-run', 'about:blank']);
 const wsUrl = await new Promise((resolve, reject) => {
   let buf = '';
@@ -65,20 +65,20 @@ const screenshot = async name => {
 await send('Runtime.enable'); await send('Page.enable');
 await send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 900, deviceScaleFactor: 1, mobile: false });
 await send('Page.navigate', { url: APP });
-for (let i = 0; i < 60 && !(await evaluate('!!window.__mapcast').catch(() => false)); i++) await sleep(250);
+for (let i = 0; i < 60 && !(await evaluate('!!window.__topoforge').catch(() => false)); i++) await sleep(250);
 await evaluate(`window.__checkSolid = ${checkSolid.toString()}; true`);
 
 // ---------- page helpers ----------
 const setArea = (lat, lng, zoom, layers) => evaluate(`(() => {
-  const mc = window.__mapcast;
+  const mc = window.__topoforge;
   if (!document.querySelector('#preview').classList.contains('hidden')) document.querySelector('#pvClose').click();
   mc.map.setView([${lat}, ${lng}], ${zoom}, { animate: false });
   const want = ${JSON.stringify(layers)};
   for (const id of ['lTerrain', 'lWater', 'lBuildings', 'lRoads', 'lPaths']) { const c = document.getElementById(id); if (!c.disabled && c.checked !== !!want[id]) c.click(); }
   document.querySelector('#useView').click(); return true; })()`);
 const generate = () => evaluate(`(async () => {
-  const t0 = performance.now(); await window.__mapcast.generate();
-  const m = window.__mapcast.lastModel, status = document.querySelector('#status').textContent;
+  const t0 = performance.now(); await window.__topoforge.generate();
+  const m = window.__topoforge.lastModel, status = document.querySelector('#status').textContent;
   return { ms: Math.round(performance.now() - t0), status, failed: document.querySelector('#status').classList.contains('err'),
     parts: m ? Object.fromEntries(m.layers.map(l => [l.id, window.__checkSolid(l.arr)])) : {} };
 })()`);
@@ -126,7 +126,7 @@ const SCENARIOS = {
       const dt = new DataTransfer(); dt.items.add(new File([${JSON.stringify(gpx)}], 'loop.gpx', { type: 'application/gpx+xml' }));
       const input = document.querySelector('#routeFile'); input.files = dt.files; input.dispatchEvent(new Event('change')); return true; })()`);
     await sleep(800);
-    const ui = await evaluate(`({ info: document.querySelector('#routeInfo').textContent.replace(/\\s+/g, ' ').trim(), chip: !document.getElementById('lRoute').parentElement.classList.contains('hidden'), shape: !!window.__mapcast.state.shape })`);
+    const ui = await evaluate(`({ info: document.querySelector('#routeInfo').textContent.replace(/\\s+/g, ' ').trim(), chip: !document.getElementById('lRoute').parentElement.classList.contains('hidden'), shape: !!window.__topoforge.state.shape })`);
     check('GPX import shows the route and frames the area', ui.info.includes('E2E loop') && ui.chip && ui.shape, JSON.stringify(ui));
     const r = await generate();
     check('route generates as its own part', !r.failed && !!r.parts.route, `${r.ms} ms · ${r.status}`);
@@ -157,7 +157,7 @@ const SCENARIOS = {
     await evaluate(`(() => { for (const [id, v] of [['selTX', '2'], ['selTY', '2']]) { const s = document.getElementById(id); s.value = v; s.dispatchEvent(new Event('change')); }
       const t = document.querySelector('#tLabel'); t.value = 'Thunersee'; t.dispatchEvent(new Event('change')); return true; })()`);
     const r = await generate();
-    const ui = await evaluate(`({ rows: document.querySelectorAll('#dlParts .tile-row').length, label: document.querySelector('#partsLabel').textContent, tiles: (window.__mapcast.lastModel.tiles || []).map(t => t.name) })`);
+    const ui = await evaluate(`({ rows: document.querySelectorAll('#dlParts .tile-row').length, label: document.querySelector('#partsLabel').textContent, tiles: (window.__topoforge.lastModel.tiles || []).map(t => t.name) })`);
     await evaluate(`(() => { for (const id of ['selTX', 'selTY']) { const s = document.getElementById(id); s.value = '1'; s.dispatchEvent(new Event('change')); }
       const t = document.querySelector('#tLabel'); t.value = ''; t.dispatchEvent(new Event('change')); return true; })()`);
     check('2 × 2 tiles (+ label plate, keys) generate', !r.failed && ui.tiles.join().startsWith('A1,B1,A2,B2,Label'), `${r.ms} ms · ${JSON.stringify(ui)}`);
@@ -193,11 +193,11 @@ const SCENARIOS = {
     for (const [name, lat, lng, zoom, extra] of places) {
       await setArea(lat, lng, zoom, { lTerrain: 1 });
       const r = await evaluate(`(async () => {
-        const mc = window.__mapcast, ring = Object.values(mc.map._layers).find(l => l instanceof L.Polygon && l.options.className === 'shape-path').getLatLngs()[0].map(p => ({ lat: p.lat, lng: p.lng }));
+        const mc = window.__topoforge, ring = Object.values(mc.map._layers).find(l => l instanceof L.Polygon && l.options.className === 'shape-path').getLatLngs()[0].map(p => ({ lat: p.lat, lng: p.lng }));
         const S = { ...mc.readSettings(), water: false, ...${JSON.stringify(extra)} };
         const out = {};
         for (const adaptive of [false, true]) {
-          const t0 = performance.now(), m = await Mapcast.buildModel(ring, { ...S, adaptive });
+          const t0 = performance.now(), m = await Topoforge.buildModel(ring, { ...S, adaptive });
           const tris = m.layers.reduce((s, l) => s + l.arr.length / 9, 0), solid = window.__checkSolid(m.layers[0].arr);
           out[adaptive ? 'adaptive' : 'uniform'] = { tris, mb: +(tris * 50 / 1048576).toFixed(1), ms: Math.round(performance.now() - t0), open: solid.openEdges, nm: solid.nonManifoldEdges };
         }
@@ -212,7 +212,7 @@ const SCENARIOS = {
     // Opens straight away, in the building state, over a darkened backdrop.
     const during = await evaluate(`(async () => {
       document.querySelector('#generate').focus();
-      const p = window.__mapcast.generate(); window.__gen = p;
+      const p = window.__topoforge.generate(); window.__gen = p;
       await new Promise(r => setTimeout(r, 400));
       const m = document.querySelector('#preview'), bd = getComputedStyle(document.querySelector('#pvBackdrop'));
       return { open: !m.classList.contains('hidden'), state: m.dataset.state, title: document.querySelector('#pvTitle').textContent, msg: document.querySelector('#pvLoadMsg').textContent, backdrop: bd.backgroundColor, focusInside: m.contains(document.activeElement) };
@@ -231,18 +231,31 @@ const SCENARIOS = {
     // Clicking the backdrop while building cancels the build.
     const cancel = await evaluate(`(async () => {
       document.querySelector('#detail button[data-v="0.4"]').click();
-      const p = window.__mapcast.generate(); await new Promise(r => setTimeout(r, 300));
+      const p = window.__topoforge.generate(); await new Promise(r => setTimeout(r, 300));
       document.querySelector('#pvBackdrop').click(); await p;
       document.querySelector('#detail button[data-v="0.7"]').click();
       return { closed: document.querySelector('#preview').classList.contains('hidden'), status: document.querySelector('#status').textContent };
     })()`);
     check('clicking the darkened background while building cancels', cancel.closed && cancel.status === 'Cancelled.', JSON.stringify(cancel));
   },
+  async rename() {
+    // Settings saved under the app's old name (Mapcast) carry over once, then the old key is gone.
+    await evaluate(`(() => { localStorage.clear(); localStorage.setItem('mapcast-v1', JSON.stringify({ view: [47.3769, 8.5417, 13], settings: { tLabel: 'Zurich' } })); return true; })()`);
+    await send('Page.reload');
+    for (let i = 0; i < 60 && !(await evaluate('!!window.__topoforge').catch(() => false)); i++) await sleep(250);
+    await evaluate(`window.__checkSolid = ${checkSolid.toString()}; true`); // the reload cleared the injected helper
+    const r = await evaluate(`(() => { const c = window.__topoforge.map.getCenter();
+      return { lat: +c.lat.toFixed(3), label: document.querySelector('#tLabel').value, oldGone: localStorage.getItem('mapcast-v1') === null, newKey: !!localStorage.getItem('topoforge-v1'),
+        title: document.title, brand: document.querySelector('.brand h1').textContent }; })()`);
+    check('settings saved under the old name carry over', r.lat === 47.377 && r.label === 'Zurich' && r.oldGone && r.newKey, JSON.stringify(r));
+    check('the app is called Topoforge', /^Topoforge/.test(r.title) && r.brand === 'Topoforge', `${r.title} / ${r.brand}`);
+    await evaluate(`(() => { const t = document.querySelector('#tLabel'); t.value = ''; t.dispatchEvent(new Event('change')); return true; })()`);
+  },
   async cancel() {
     await setArea(46.5586, 7.8357, 11, { lTerrain: 1 });
     await evaluate(`document.querySelector('#detail button[data-v="0.4"]').click(), true`);
     const r = await evaluate(`(async () => {
-      const p = window.__mapcast.generate(); await new Promise(r => setTimeout(r, 800));
+      const p = window.__topoforge.generate(); await new Promise(r => setTimeout(r, 800));
       const label = document.querySelector('#generate').textContent.trim(); document.querySelector('#generate').click(); await p;
       return { label, status: document.querySelector('#status').textContent, after: document.querySelector('#generate').textContent.trim() };
     })()`);

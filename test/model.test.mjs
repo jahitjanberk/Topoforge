@@ -91,7 +91,7 @@ test('connector keys: one per seam, pockets cut, keys fit, everything watertight
 });
 
 test('small map scales leave out unprintable detail (buildings, minor roads)', async () => {
-  const { detailForScale } = globalThis.Mapcast;
+  const { detailForScale } = globalThis.Topoforge;
   assert.equal(detailForScale(20000, false).level, '', 'city scale keeps everything');
   assert.ok(detailForScale(20000, true).roadClasses.includes('footway'));
   assert.equal(detailForScale(100000, false).buildings, false);

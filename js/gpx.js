@@ -2,9 +2,9 @@
    reads track segments (<trkseg>/<trkpt>) and routes (<rte>/<rtept>); waypoints are ignored. */
 (() => {
 'use strict';
-const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
+const Topoforge = globalThis.Topoforge = globalThis.Topoforge || {};
 
-const { D2R } = Mapcast;
+const { D2R } = Topoforge;
 
 const attr = (tag, name) => {
   const m = tag.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']+)["']`, 'i'));
@@ -61,5 +61,5 @@ function parseGPX(text, fallbackName = 'Route') {
   return { name: (nm && decode(nm[1])) || fallbackName, segs: simplified, km };
 }
 
-Object.assign(Mapcast, { parseGPX, haversineKm, simplifyLL });
+Object.assign(Topoforge, { parseGPX, haversineKm, simplifyLL });
 })();

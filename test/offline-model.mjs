@@ -3,7 +3,7 @@
 import vm from 'node:vm';
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadMapcast, ROOT } from './load.mjs';
+import { loadTopoforge, ROOT } from './load.mjs';
 
 const sq = (lat, lng, d) => [[lat, lng], [lat, lng + d], [lat + d, lng + d], [lat + d, lng], [lat, lng]].map(([la, lo]) => ({ lat: la, lon: lo }));
 
@@ -18,7 +18,7 @@ export const SETTINGS = {
 let built = null;
 export function loadOfflineModel() {
   if (built) return built;
-  const M = loadMapcast();
+  const M = loadTopoforge();
   // Synthetic hills instead of AWS elevation tiles.
   M.loadElevation = async () => ({
     sample: (lat, lng) => 500 + 300 * Math.sin((lat - 46.69) * 300) * Math.cos((lng - 7.85) * 200),
@@ -39,5 +39,5 @@ export function loadOfflineModel() {
     ]
   });
   for (const f of ['js/water.js', 'js/model.js', 'js/threemf.js']) vm.runInThisContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), { filename: f });
-  return (built = globalThis.Mapcast);
+  return (built = globalThis.Topoforge);
 }

@@ -1,10 +1,10 @@
 // Unit tests for stepped terrain (no network).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadMapcast } from './load.mjs';
+import { loadTopoforge } from './load.mjs';
 import { checkSolid, isWatertight } from './solid.mjs';
 
-const { buildTerrain, terrainSolid, quantizer, contourPoints } = loadMapcast();
+const { buildTerrain, terrainSolid, quantizer, contourPoints } = loadTopoforge();
 
 // A smooth hill: 0 m at the edges to ~300 m in the middle; model scale 0.05 mm/m, 3 mm base.
 const hill = (x, y) => 300 * Math.exp(-(x * x + y * y) / 900);

@@ -3,9 +3,9 @@
    (OffscreenCanvas) and on the page; traceMask is pure so it can be unit-tested in Node. */
 (() => {
 'use strict';
-const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
+const Topoforge = globalThis.Topoforge = globalThis.Topoforge || {};
 
-const { simplifyDP, signedArea, inRing } = Mapcast;
+const { simplifyDP, signedArea, inRing } = Topoforge;
 
 // mask: Uint8Array (1 = ink), w×h pixels, row-major with y pointing down.
 // Returns closed loops of pixel-corner points in a y-up frame (x = column, y = -row):
@@ -113,5 +113,5 @@ function textPolygons(text, { cx, cy, heightMm, maxWidthMm, ppm = 16 }) {
   return out;
 }
 
-Object.assign(Mapcast, { traceMask, loopsToPolygons, hasCrossings, textPolygons });
+Object.assign(Topoforge, { traceMask, loopsToPolygons, hasCrossings, textPolygons });
 })();

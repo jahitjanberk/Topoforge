@@ -12,7 +12,7 @@ importScripts(
 self.onmessage = async e => {
   const { id, ring, settings } = e.data;
   try {
-    const result = await Mapcast.buildModel(ring, settings, (msg, frac) => self.postMessage({ id, type: 'status', msg, frac }));
+    const result = await Topoforge.buildModel(ring, settings, (msg, frac) => self.postMessage({ id, type: 'status', msg, frac }));
     self.postMessage({ id, type: 'done', result }, result.layers.map(l => l.arr.buffer));
   } catch (err) {
     self.postMessage({ id, type: 'error', message: (err && err.message) || String(err) });

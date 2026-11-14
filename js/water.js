@@ -4,7 +4,7 @@
    All coordinates here are model millimetres (x right, y up), as in model.js. */
 (() => {
 'use strict';
-const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
+const Topoforge = globalThis.Topoforge = globalThis.Topoforge || {};
 
 const NONE = 0, LAKE = 1, FLOW = 2;
 const MAX_GRID = 2048; // cells per side
@@ -114,5 +114,5 @@ function buildWaterMask(osm, opts) {
   };
 }
 
-Object.assign(Mapcast, { buildWaterMask, WATER: { NONE, LAKE, FLOW } });
+Object.assign(Topoforge, { buildWaterMask, WATER: { NONE, LAKE, FLOW } });
 })();

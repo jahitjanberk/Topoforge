@@ -1,10 +1,10 @@
-# Mapcast
+# Topoforge
 
 Turn any place on Earth into a 3D-printable model. Find a location, draw the area you want, and download its terrain, with lakes, rivers, roads and buildings if you like, as a ready-to-slice 3MF or STL file.
 
 Everything runs in your browser. There's no account, no API key and no build step.
 
-![Mapcast: a terrain model of the Bernese Oberland with lakes and rivers, ready to download](img/screenshot.png)
+![Topoforge: a terrain model of the Bernese Oberland with lakes and rivers, ready to download](img/screenshot.png)
 
 ## Features
 
@@ -22,7 +22,7 @@ You need [Node.js](https://nodejs.org) (version 20 or newer; the LTS download is
 
 1. **Get the code:** click **Code → Download ZIP** on GitHub and unzip it, or clone it:
    ```sh
-   git clone https://github.com/jahitjanberk/MapSTL.git
+   git clone https://github.com/jahitjanberk/Topoforge.git
    ```
 2. **Start it:**
    - **Windows:** double-click `start.bat`.
@@ -31,7 +31,7 @@ You need [Node.js](https://nodejs.org) (version 20 or newer; the LTS download is
 
 Port 8080 already in use? Pick another: `PORT=8081 ./start.sh` on macOS/Linux, or `set PORT=8081 && node serve.js` on Windows.
 
-There's also a hosted copy at **https://jahitjanberk.github.io/MapSTL/**.
+There's also a hosted copy at **https://jahitjanberk.github.io/Topoforge/**.
 
 ## Using it
 
@@ -54,11 +54,11 @@ Tips:
 
 ## Fair use of the free map services
 
-Every copy of Mapcast uses free, community-run services: OpenStreetMap's map tiles and the Overpass API (roads, buildings, water). They're fine for personal use, but they have [usage policies](https://operations.osmfoundation.org/policies/tiles/), and Overpass limits heavy users. Please don't script mass downloads. If you run Mapcast for many people, switch to your own or a commercial tile server: the tile address is `OSM.url` in `js/basemaps.js`.
+Every copy of Topoforge uses free, community-run services: OpenStreetMap's map tiles and the Overpass API (roads, buildings, water). They're fine for personal use, but they have [usage policies](https://operations.osmfoundation.org/policies/tiles/), and Overpass limits heavy users. Please don't script mass downloads. If you run Topoforge for many people, switch to your own or a commercial tile server: the tile address is `OSM.url` in `js/basemaps.js`.
 
 ## Credits and licences
 
-Mapcast is released under the [MIT License](LICENSE).
+Topoforge is released under the [MIT License](LICENSE).
 
 **Data** (credited in the app as well):
 - Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), available under the Open Database License (ODbL).
@@ -85,7 +85,7 @@ npm run test:e2e     # browser tests in headless Edge/Chrome (needs internet; BR
 
 The unit tests run automatically on GitHub for every push and pull request. `test/solid.mjs` holds the watertightness check: every edge is used exactly twice, in opposite directions, with positive volume. The unit tests and the browser tests share it. Screenshots from the browser tests are saved to `test/output/`.
 
-The scripts in `js/` are plain (non-module) scripts, so the page needs no build step. Each file wraps its code in a function and shares what other files need on `window.Mapcast`, so load order in `index.html` matters.
+The scripts in `js/` are plain (non-module) scripts, so the page needs no build step. Each file wraps its code in a function and shares what other files need on `window.Topoforge`, so load order in `index.html` matters.
 
 ```
 index.html        page markup

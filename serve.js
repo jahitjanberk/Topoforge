@@ -33,7 +33,7 @@ server.on('error', err => {
 
 server.listen(PORT, '127.0.0.1', () => {
   const url = `http://localhost:${PORT}/`;
-  console.log(`Mapcast is running at ${url}  (Ctrl+C to stop)`);
+  console.log(`Topoforge is running at ${url}  (Ctrl+C to stop)`);
   if (!process.argv.includes('--no-open')) {
     const cmd = process.platform === 'win32' ? `start "" "${url}"` : process.platform === 'darwin' ? `open "${url}"` : `xdg-open "${url}"`;
     exec(cmd);

@@ -1,5 +1,5 @@
 // Loads the app's classic scripts into this Node process, the same way the page/worker does
-// (each file adds its functions to globalThis.Mapcast). Libraries come from node_modules at the
+// (each file adds its functions to globalThis.Topoforge). Libraries come from node_modules at the
 // exact versions index.html loads from the CDN.
 import vm from 'node:vm';
 import fs from 'node:fs';
@@ -15,8 +15,8 @@ const FILES = [
 ];
 
 let loaded = null;
-export function loadMapcast() {
+export function loadTopoforge() {
   if (loaded) return loaded;
   for (const f of FILES) vm.runInThisContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), { filename: f });
-  return (loaded = globalThis.Mapcast);
+  return (loaded = globalThis.Topoforge);
 }

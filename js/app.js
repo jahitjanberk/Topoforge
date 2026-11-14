@@ -1,19 +1,19 @@
-/* Mapcast — find a place, draw a print area, export the terrain as STL.
+/* Topoforge — find a place, draw a print area, export the terrain as STL.
    This module wires up the UI: map, drawing tools, search, settings and persistence. */
 (() => {
 'use strict';
-const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
+const Topoforge = globalThis.Topoforge = globalThis.Topoforge || {};
 
-const { $, $$ } = Mapcast;
-const { D2R, toLocal, fromLocal, rot, fmtLen, fmtArea, signedArea, bbox, cleanRing, simplifyDP } = Mapcast;
-const { osmLayer, reliefLayer } = Mapcast;
-const { createTerrainView } = Mapcast;
-const { createGenerator } = Mapcast;
-const { showPreview, closePreview, isPreviewOpen } = Mapcast;
-const { toSTL, download } = Mapcast;
+const { $, $$ } = Topoforge;
+const { D2R, toLocal, fromLocal, rot, fmtLen, fmtArea, signedArea, bbox, cleanRing, simplifyDP } = Topoforge;
+const { osmLayer, reliefLayer } = Topoforge;
+const { createTerrainView } = Topoforge;
+const { createGenerator } = Topoforge;
+const { showPreview, closePreview, isPreviewOpen } = Topoforge;
+const { toSTL, download } = Topoforge;
 
 const ACCENT = '#f25c2a';
-const STORE = 'mapcast-v1';
+const STORE = 'topoforge-v1';
 
 const state = { tool: 'select', shape: null, place: '', relief: true, view3d: false, route: null };
 const keys = { shift: false, alt: false, space: false };
@@ -460,7 +460,7 @@ $('#useView').onclick = () => {
 /* =====================================================================
    GPX route
    ===================================================================== */
-const ROUTE_STORE = 'mapcast-route-v1';
+const ROUTE_STORE = 'topoforge-route-v1';
 const ROUTE_COLOR = '#e11d48';
 let routeLine = null;
 function setRoute(route, { fit = false, persist = true } = {}) {
@@ -496,7 +496,7 @@ const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<':
 async function importRouteFile(file) {
   if (!file) return;
   try {
-    const r = Mapcast.parseGPX(await file.text(), file.name.replace(/\.gpx$/i, ''));
+    const r = Topoforge.parseGPX(await file.text(), file.name.replace(/\.gpx$/i, ''));
     // A brand-new route usually means "print this": frame it unless an area is already drawn around it.
     const inside = state.shape && L.latLngBounds(shapeRing(state.shape, 64)).contains(L.latLngBounds(r.segs.flat()));
     setRoute(r, { fit: !inside });
@@ -561,7 +561,7 @@ function updateAreaPanel() {
   const km2 = m.area / 1e6;
   let warn = '';
   // What the map scale will leave out (the model builder applies the same rule).
-  const detail = Mapcast.detailForScale(ratio, S.paths), dropped = [];
+  const detail = Topoforge.detailForScale(ratio, S.paths), dropped = [];
   if (S.buildings && !detail.buildings) dropped.push('buildings');
   if (S.roads && detail.level) dropped.push(`smaller roads (only ${detail.level} are kept)`);
   if (dropped.length) warn = `At 1:${r3.toLocaleString()} some detail is too small to print, so the model leaves out ${dropped.join(' and ')}.`;
@@ -721,15 +721,15 @@ $('#generate').onclick = () => busy ? generator.cancel() : generate();
 async function generate() {
   if (!state.shape || busy) return;
   setBusy(true);
-  Mapcast.openModal(); // the pop-up shows progress, then the model
+  Topoforge.openModal(); // the pop-up shows progress, then the model
   try {
-    const result = await generator.run(shapeRing(state.shape, 256), readSettings(), (msg, frac) => { setStatus(msg, 'busy', frac); Mapcast.modalProgress(msg, frac); });
+    const result = await generator.run(shapeRing(state.shape, 256), readSettings(), (msg, frac) => { setStatus(msg, 'busy', frac); Topoforge.modalProgress(msg, frac); });
     lastModel = { ...result, name: slug(), title: modelTitle() };
     await showPreview(lastModel);
     setStatus(['Model ready.', ...result.notes].join(' '));
   } catch (err) {
     if (err && err.cancelled) { setStatus('Cancelled.'); closePreview(); }
-    else { console.error(err); setStatus(err.message || String(err), 'err'); Mapcast.modalError(err.message || String(err)); }
+    else { console.error(err); setStatus(err.message || String(err), 'err'); Topoforge.modalError(err.message || String(err)); }
   } finally { setBusy(false); }
 }
 // Closing the pop-up (✕, Esc, Back, the darkened background) while a model is building cancels it.
@@ -741,25 +741,33 @@ $('#dlAll').onclick = () => lastModel && download(toSTL(lastModel.layers.map(l =
 $('#dl3mf').onclick = async () => {
   if (!lastModel) return;
   const btn = $('#dl3mf'); btn.disabled = true;
-  try { download(await Mapcast.to3MF(Mapcast.modelPieces(lastModel, modelTitle()), { title: modelTitle() }), lastModel.name + '.3mf'); }
+  try { download(await Topoforge.to3MF(Topoforge.modelPieces(lastModel, modelTitle()), { title: modelTitle() }), lastModel.name + '.3mf'); }
   catch (err) { console.error(err); setStatus('Could not create the 3MF file: ' + (err.message || err), 'err'); }
   finally { btn.disabled = false; }
 };
-// Human-readable model name for 3MF objects: the place, else "Mapcast model".
-function modelTitle() { return state.place || ($('#tLabel').value.trim()) || 'Mapcast model'; }
+// Human-readable model name for 3MF objects: the place, else "Topoforge model".
+function modelTitle() { return state.place || ($('#tLabel').value.trim()) || 'Topoforge model'; }
 for (const id of ['pvClose', 'pvBack', 'pvCancel', 'pvBackdrop']) $('#' + id).onclick = requestClosePreview;
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && isPreviewOpen()) { e.preventDefault(); requestClosePreview(); } });
 
 function slug() {
   const base = state.place || (state.shape ? (() => { const c = L.latLngBounds(shapeRing(state.shape, 16)).getCenter(); return `${c.lat.toFixed(4)}_${c.lng.toFixed(4)}`; })() : 'model');
-  return 'mapcast-' + base.toLowerCase().replace(/[^a-z0-9_.-]+/g, '-').replace(/^-|-$/g, '');
+  return 'topoforge-' + base.toLowerCase().replace(/[^a-z0-9_.-]+/g, '-').replace(/^-|-$/g, '');
 }
 /* ---------- boot ---------- */
+// One-time move of data saved under the app's old name (Mapcast), so returning users keep it.
+try {
+  for (const [from, to] of [['mapcast-v1', STORE], ['mapcast-route-v1', ROUTE_STORE]]) {
+    const old = localStorage.getItem(from);
+    if (old != null && localStorage.getItem(to) == null) localStorage.setItem(to, old);
+    if (old != null) localStorage.removeItem(from);
+  }
+} catch (e) { /* storage unavailable */ }
 const saved = load();
 setRelief(state.relief);
 try { const r = JSON.parse(localStorage.getItem(ROUTE_STORE) || 'null'); if (r && r.segs) setRoute(r, { persist: false }); } catch (e) { /* ignore */ }
 syncLayerUi();
 setTool('select');
 if (saved && saved.view3d) set3D(true);
-window.__mapcast = { state, map, generate, setTool, readSettings, get lastModel() { return lastModel; } };
+window.__topoforge = { state, map, generate, setTool, readSettings, get lastModel() { return lastModel; } };
 })();

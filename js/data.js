@@ -1,9 +1,9 @@
 /* Data sources: elevation (AWS Terrarium tiles) + OpenStreetMap (Overpass) */
 (() => {
 'use strict';
-const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
+const Topoforge = globalThis.Topoforge = globalThis.Topoforge || {};
 
-const { D2R, tileXY, inRing } = Mapcast;
+const { D2R, tileXY, inRing } = Topoforge;
 
 const TERRARIUM_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
 
@@ -236,5 +236,5 @@ function parseOSM(js) {
   return { buildings, roads, water, rivers };
 }
 
-Object.assign(Mapcast, { TERRARIUM_URL, loadElevation, OVERPASS, fetchOverpass, ROADS, PATHS, BH, buildingHeight, parseOSM, assembleRings, areaFilter, detailForScale });
+Object.assign(Topoforge, { TERRARIUM_URL, loadElevation, OVERPASS, fetchOverpass, ROADS, PATHS, BH, buildingHeight, parseOSM, assembleRings, areaFilter, detailForScale });
 })();

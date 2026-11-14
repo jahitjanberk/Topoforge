@@ -2,10 +2,10 @@
 // Run: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadMapcast } from './load.mjs';
+import { loadTopoforge } from './load.mjs';
 import { checkSolid, isWatertight } from './solid.mjs';
 
-const M = loadMapcast();
+const M = loadTopoforge();
 const { buildTerrain, terrainSolid, refineWater, splitWater, addPrism, addRoadBox, toSTL, signedArea } = M;
 
 // Synthetic landscape (metres) and the model mapping used by model.js (base 3 mm).

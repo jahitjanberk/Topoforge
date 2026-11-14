@@ -5,9 +5,9 @@
    Pure geometry: runs in the worker, on the page and in Node tests. Units: model mm (x, y). */
 (() => {
 'use strict';
-const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
+const Topoforge = globalThis.Topoforge = globalThis.Topoforge || {};
 
-const { bbox, inRing } = Mapcast;
+const { bbox, inRing } = Topoforge;
 
 // Rounds elevations down to steps of stepM metres above base level m0.
 function quantizer(m0, stepM) {
@@ -58,5 +58,5 @@ function contourPoints(ring, h, elevAt, m0, stepM, { gap = 0.04, maxPoints = 400
   return out;
 }
 
-Object.assign(Mapcast, { quantizer, contourPoints });
+Object.assign(Topoforge, { quantizer, contourPoints });
 })();

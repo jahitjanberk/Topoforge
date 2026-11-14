@@ -3,10 +3,10 @@
    here is the relief you will print. MapLibre is loaded lazily the first time 3D opens. */
 (() => {
 'use strict';
-const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
+const Topoforge = globalThis.Topoforge = globalThis.Topoforge || {};
 
-const { TERRARIUM_URL } = Mapcast;
-const { OSM } = Mapcast;
+const { TERRARIUM_URL } = Topoforge;
+const { OSM } = Topoforge;
 
 const MAPLIBRE_VERSION = '4.7.1';
 const MAPLIBRE_JS = `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.js`;
@@ -125,5 +125,5 @@ function createTerrainView(container) {
   };
 }
 
-Object.assign(Mapcast, { createTerrainView });
+Object.assign(Topoforge, { createTerrainView });
 })();

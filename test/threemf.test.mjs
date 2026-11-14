@@ -6,7 +6,7 @@ import { loadOfflineModel, RING, SETTINGS } from './offline-model.mjs';
 
 const M = loadOfflineModel();
 const { to3MF, crc32, buildModel, addPrism } = M;
-const Mapcast = M;
+const Topoforge = M;
 
 // Minimal zip reader (central directory → entries), verifying every CRC.
 function unzip(buf) {
@@ -105,7 +105,7 @@ test('a two-part model exports as one object with two named, coloured parts', as
 
 test('a real tiled model exports one object per tile, each with watertight coloured parts', async () => {
   const model = await buildModel(RING, { ...SETTINGS, tilesX: 2, tilesY: 1, label: '' });
-  const { objects, items, bases } = await read3MF(await to3MF(Mapcast.modelPieces(model, 'Test')));
+  const { objects, items, bases } = await read3MF(await to3MF(Topoforge.modelPieces(model, 'Test')));
   assert.deepEqual(items.map(i => objects.get(i).name), ['Test — tile A1', 'Test — tile B1', 'Test — connector keys']);
   assert.deepEqual(bases.map(b => b.name).sort(), ['Buildings', 'Connector keys', 'Roads', 'Route', 'Terrain &amp; base'], 'one material per part type, shared by tiles');
   let parts = 0;

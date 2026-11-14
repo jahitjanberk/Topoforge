@@ -7,15 +7,15 @@
    shared height scale and base level, so tiles meet exactly. A single model is one tile. */
 (() => {
 'use strict';
-const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
+const Topoforge = globalThis.Topoforge = globalThis.Topoforge || {};
 
-const { Bounds, toLocal, fromLocal, simplifyDP, haversineKm, bbox, cleanRing, signedArea, inRing, distToRing } = Mapcast;
-const { clipPolygonRect, rectContains, rectsOverlap } = Mapcast;
-const { loadElevation, fetchOverpass, parseOSM, buildingHeight, ROADS, PATHS, detailForScale } = Mapcast;
-const { buildTerrain, terrainSolid, refineWater, splitWater, addPrism, addRoadBox } = Mapcast;
-const { buildWaterMask, WATER } = Mapcast;
-const { textPolygons, hasCrossings } = Mapcast;
-const { quantizer, contourPoints } = Mapcast;
+const { Bounds, toLocal, fromLocal, simplifyDP, haversineKm, bbox, cleanRing, signedArea, inRing, distToRing } = Topoforge;
+const { clipPolygonRect, rectContains, rectsOverlap } = Topoforge;
+const { loadElevation, fetchOverpass, parseOSM, buildingHeight, ROADS, PATHS, detailForScale } = Topoforge;
+const { buildTerrain, terrainSolid, refineWater, splitWater, addPrism, addRoadBox } = Topoforge;
+const { buildWaterMask, WATER } = Topoforge;
+const { textPolygons, hasCrossings } = Topoforge;
+const { quantizer, contourPoints } = Topoforge;
 
 const tick = () => new Promise(r => setTimeout(r, 16));
 
@@ -435,5 +435,5 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
   return { layers, tiles: tiled ? tiles.map(t => ({ name: t.name })) : null, stats, notes };
 }
 
-Object.assign(Mapcast, { buildModel });
+Object.assign(Topoforge, { buildModel });
 })();
