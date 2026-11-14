@@ -560,7 +560,12 @@ function updateAreaPanel() {
   $('#aMeta').innerHTML = `${s.type === 'poly' ? `<b>${dimsText(s)}</b> · ${s.pts.length} points<br>` : ''}Area <b>${fmtArea(m.area)}</b><br>Model <b>${Math.round(m.w * k)} × ${Math.round(m.h * k)} mm</b> · scale 1:${r3.toLocaleString()}${tiled ? `<br>${S.tilesX * S.tilesY} tiles of up to <b>${Math.round(m.w * k / S.tilesX)} × ${Math.round(m.h * k / S.tilesY)} mm</b>` : ''}`;
   const km2 = m.area / 1e6;
   let warn = '';
-  if (S.buildings && km2 > 25) warn = `Large area for buildings (${km2.toFixed(0)} km²). Downloading may be slow or time out, and buildings will be tiny at this scale — consider terrain only.`;
+  // What the map scale will leave out (the model builder applies the same rule).
+  const detail = Mapcast.detailForScale(ratio, S.paths), dropped = [];
+  if (S.buildings && !detail.buildings) dropped.push('buildings');
+  if (S.roads && detail.level) dropped.push(`smaller roads (only ${detail.level} are kept)`);
+  if (dropped.length) warn = `At 1:${r3.toLocaleString()} some detail is too small to print, so the model leaves out ${dropped.join(' and ')}.`;
+  else if (S.buildings && km2 > 25) warn = `Large area for buildings (${km2.toFixed(0)} km²). Downloading may be slow or time out — consider a smaller area or terrain only.`;
   else if (S.terrain && !S.buildings && !S.roads && km2 < 0.5) warn = 'Small area with terrain only — it may print almost flat. Increase exaggeration or add buildings.';
   $('#aWarn').innerHTML = warn ? `<div class="warn">${warn}</div>` : '';
 }

@@ -89,3 +89,20 @@ test('connector keys: one per seam, pockets cut, keys fit, everything watertight
   assert.ok(zMax <= SETTINGS.base * 0.5 - 0.2 + 1e-6, `key thickness ${zMax}`);
   assertAllWatertight(m);
 });
+
+test('small map scales leave out unprintable detail (buildings, minor roads)', async () => {
+  const { detailForScale } = globalThis.Mapcast;
+  assert.equal(detailForScale(20000, false).level, '', 'city scale keeps everything');
+  assert.ok(detailForScale(20000, true).roadClasses.includes('footway'));
+  assert.equal(detailForScale(100000, false).buildings, false);
+  assert.ok(!detailForScale(100000, false).roadClasses.includes('service'));
+  assert.deepEqual(detailForScale(2e6, false).roadClasses.sort(), ['motorway', 'motorway_link', 'trunk', 'trunk_link']);
+  // The offline test area (~2.3 km) printed 10 mm wide is about 1:230,000: no buildings, and only
+  // the primary road survives (the residential street is dropped).
+  const m = await buildModel(RING, { ...SETTINGS, size: 10, route: null });
+  assert.ok(!m.layers.some(l => l.part === 'buildings'), 'no buildings');
+  assert.ok(m.layers.some(l => l.part === 'roads'), 'major road kept');
+  assert.match(m.notes.join(' '), /Buildings are left out/);
+  assert.match(m.notes.join(' '), /only major roads/);
+  assertAllWatertight(m);
+});

@@ -11,7 +11,7 @@ const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
 
 const { Bounds, toLocal, fromLocal, simplifyDP, haversineKm, bbox, cleanRing, signedArea, inRing, distToRing } = Mapcast;
 const { clipPolygonRect, rectContains, rectsOverlap } = Mapcast;
-const { loadElevation, fetchOverpass, parseOSM, buildingHeight, ROADS, PATHS } = Mapcast;
+const { loadElevation, fetchOverpass, parseOSM, buildingHeight, ROADS, PATHS, detailForScale } = Mapcast;
 const { buildTerrain, terrainSolid, refineWater, splitWater, addPrism, addRoadBox } = Mapcast;
 const { buildWaterMask, WATER } = Mapcast;
 const { textPolygons, hasCrossings } = Mapcast;
@@ -45,6 +45,14 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
   const notes = [];
 
   /* ---------- downloads ---------- */
+  // Match OpenStreetMap detail to the map scale (a whole country can't show streets or houses).
+  const denom = 1000 / scale, scaleText = `1:${Number(denom.toPrecision(2)).toLocaleString()}`;
+  const detail = detailForScale(denom, S.paths);
+  if (S.buildings && !detail.buildings) notes.push(`Buildings are left out at this scale (${scaleText}): even large ones would print smaller than 0.3 mm.`);
+  if (S.roads && detail.level) notes.push(`At ${scaleText} only ${detail.level} are included; smaller roads would be thinner than a printer can show.`);
+  S = { ...S, buildings: S.buildings && detail.buildings, roadClasses: detail.roadClasses, waterMinLength: detail.waterMinLength, riverAreas: detail.riverAreas };
+  const roadAllowed = new Set(detail.roadClasses);
+
   const wantWater = S.water && S.terrain; // water is cut into the terrain, so it needs terrain
   const needOsm = S.buildings || S.roads || wantWater;
   let osmError = null;
@@ -326,6 +334,7 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
     for (const [ri, rd] of osm.roads.entries()) {
       if (ri % 500 === 0) onStatus('Laying roads…', lerp(P.roads, ri / osm.roads.length));
       const t = rd.tags; if (t.tunnel && t.tunnel !== 'no') continue;
+      if (!roadAllowed.has(t.highway)) continue; // minor roads at small scales (also from cached data)
       const spec = ROADS[t.highway] || (S.paths ? PATHS[t.highway] : null); if (!spec) continue;
       const w = Math.max(spec[0] * scale, S.roadMin * spec[1]);
       if (layLine('roads', rd.pts.map(p => ll2m(p.lat, p.lon)), w, S.roadH)) nR++;

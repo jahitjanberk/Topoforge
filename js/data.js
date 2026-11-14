@@ -100,15 +100,19 @@ async function fetchOverpass(b, S, ringLL = null, onWait = () => {}) {
   if (S.buildings) parts.push(`way["building"](${f});`, `relation["building"]["type"="multipolygon"](${f});`);
   if (S.roads) {
     // Only the road classes the model uses (footpaths only when asked) — a big cut in data size.
-    const classes = Object.keys(ROADS).concat(S.paths ? Object.keys(PATHS) : []);
+    const classes = S.roadClasses || Object.keys(ROADS).concat(S.paths ? Object.keys(PATHS) : []);
     parts.push(`way["highway"~"^(${classes.join('|')})$"](${f});`);
   }
-  if (S.water) parts.push(
-    `way["natural"="water"](${f});`, `relation["natural"="water"](${f});`,
-    `way["landuse"="reservoir"](${f});`, `relation["landuse"="reservoir"](${f});`,
-    `way["waterway"="riverbank"](${f});`, `relation["waterway"="riverbank"](${f});`,
-    `way["waterway"~"^(river|canal)$"](${f});`
-  );
+  if (S.water) {
+    // At small scales, only lakes whose outline is long enough to print (Overpass length() is in m).
+    const big = S.waterMinLength > 0 ? `(if: length() > ${S.waterMinLength})` : '';
+    parts.push(
+      `way["natural"="water"](${f})${big};`, `relation["natural"="water"](${f});`,
+      `way["landuse"="reservoir"](${f})${big};`, `relation["landuse"="reservoir"](${f});`,
+      `way["waterway"~"^(river|canal)$"](${f});`
+    );
+    if (S.riverAreas !== false) parts.push(`way["waterway"="riverbank"](${f});`, `relation["waterway"="riverbank"](${f});`);
+  }
   const query = `[out:json][timeout:120];(${parts.join('')});out geom qt;`;
   if (overpassCache.has(query)) {
     const js = overpassCache.get(query);
@@ -140,6 +144,24 @@ const ROADS = {
   unclassified: [6, 1], residential: [6, 1], living_street: [5, 1], road: [6, 1], pedestrian: [5, .9], service: [4, .8], busway: [6, 1]
 };
 const PATHS = { footway: [2, .6], path: [2, .6], cycleway: [2, .6], steps: [2, .6], bridleway: [2, .6], track: [3, .7] };
+
+// Which detail a model at 1:denominator can show. A printed road is at least ~0.8 mm wide, which at
+// 1:500,000 is a 400 m wide band: minor roads would only clutter (and bloat) the model, and asking
+// the OpenStreetMap servers for every street of a region can fail outright.
+// Returns { roadClasses: [highway values], buildings: bool, level: description or '' }.
+const MAJOR = ['motorway', 'trunk', 'motorway_link', 'trunk_link'];
+// Water: beyond 1:100,000 lakes are only fetched when their outline is at least ~10 mm long on the
+// model (smaller ones would be dropped after downloading anyway), and beyond 1:300,000 riverbank
+// outlines are skipped (river lines show the rivers). A whole country otherwise means every pond.
+function detailForScale(denominator, paths) {
+  const all = Object.keys(ROADS).concat(paths ? Object.keys(PATHS) : []);
+  const water = { waterMinLength: denominator > 100000 ? Math.round(10 * denominator / 1000) : 0, riverAreas: denominator <= 300000 };
+  if (denominator <= 50000) return { roadClasses: all, buildings: true, level: '', ...water };
+  const buildings = denominator <= 75000;
+  if (denominator <= 150000) return { roadClasses: Object.keys(ROADS).filter(k => !['service', 'living_street', 'pedestrian', 'busway'].includes(k)), buildings, level: 'main and residential roads', ...water };
+  if (denominator <= 500000) return { roadClasses: MAJOR.concat(['primary', 'secondary', 'primary_link', 'secondary_link']), buildings, level: 'major roads (motorways to secondary roads)', ...water };
+  return { roadClasses: MAJOR, buildings, level: 'motorways and trunk roads', ...water };
+}
 const BH = { house: 7, detached: 7, semidetached_house: 7, bungalow: 4, terrace: 8, garage: 3, garages: 3, shed: 3, hut: 3, roof: 4, carport: 3, apartments: 15, residential: 10, commercial: 12, office: 18, retail: 8, industrial: 9, warehouse: 9, church: 15, cathedral: 35, hospital: 18, school: 9, university: 14, hotel: 18 };
 function buildingHeight(t) {
   const p = v => { if (v == null) return null; const f = parseFloat(String(v).replace(',', '.')); return isFinite(f) ? f : null; };
@@ -214,5 +236,5 @@ function parseOSM(js) {
   return { buildings, roads, water, rivers };
 }
 
-Object.assign(Mapcast, { TERRARIUM_URL, loadElevation, OVERPASS, fetchOverpass, ROADS, PATHS, BH, buildingHeight, parseOSM, assembleRings, areaFilter });
+Object.assign(Mapcast, { TERRARIUM_URL, loadElevation, OVERPASS, fetchOverpass, ROADS, PATHS, BH, buildingHeight, parseOSM, assembleRings, areaFilter, detailForScale });
 })();

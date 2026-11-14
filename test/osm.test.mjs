@@ -54,3 +54,12 @@ test('parseOSM: lake relation from split ways, with an island; river line; build
   assert.equal(o.buildings.length, 1);
   assert.equal(o.roads.length, 1);
 });
+
+test('small map scales ask Overpass only for printable water', () => {
+  const { detailForScale } = loadMapcast();
+  const city = detailForScale(20000, false), country = detailForScale(2e6, false);
+  assert.equal(city.waterMinLength, 0);
+  assert.equal(city.riverAreas, true);
+  assert.equal(country.waterMinLength, 20000, '10 mm of outline at 1:2,000,000 = 20 km');
+  assert.equal(country.riverAreas, false);
+});

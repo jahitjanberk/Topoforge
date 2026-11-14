@@ -69,6 +69,21 @@ Roads and buildings are simplified to what the model can show (0.05 mm). Road pi
 
 On a synthetic test landscape the adaptive mesh uses 44% fewer triangles with the same height error as the even grid (max 0.33 mm, average 0.034 mm; see `test/mesh.test.mjs`).
 
+## Detail by scale
+
+The map scale decides how much OpenStreetMap detail a model can show. A printed road is at least ~0.8 mm wide: at 1:500,000 that's a 400 m wide band.
+
+| Scale | Roads | Buildings | Water |
+|---|---|---|---|
+| up to 1:50,000 | all | yes | all |
+| to 1:75,000 | main + residential | yes | all |
+| to 1:150,000 | main + residential | no | all |
+| to 1:300,000 | motorway → secondary | no | lakes with an outline ≥ ~10 mm on the model |
+| to 1:500,000 | motorway → secondary | no | same, without riverbank outlines (river lines stay) |
+| beyond | motorways + trunk roads | no | same |
+
+Left-out layers aren't downloaded, which keeps country-sized requests within what the free servers will answer. The area panel and the model notes say what was left out.
+
 ## GPX routes
 
 **Import a GPX route…** in step 2, or drop a `.gpx` file on the map. Track segments and routes are read; waypoints are ignored. The route is drawn on the 2D map and in the 3D view, and the print area is fitted around it unless it's already inside one. In the model it becomes a raised strip that follows the terrain, as its own `*-route.stl` part. Width and height are under Advanced.
