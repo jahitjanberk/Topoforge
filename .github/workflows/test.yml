@@ -1,0 +1,22 @@
+# Runs the unit tests (no network needed) on every push and pull request.
+# The browser tests (npm run test:e2e) need internet access and a browser, so they're run by hand.
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test

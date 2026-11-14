@@ -2,7 +2,16 @@
   "name": "mapcast",
   "version": "1.0.0",
   "private": true,
-  "description": "Find a place and export its terrain as an STL for 3D printing.",
+  "description": "Turn any place into a 3D-printable terrain model (3MF/STL), right in the browser.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jahitjanberk/MapSTL.git"
+  },
+  "homepage": "https://jahitjanberk.github.io/MapSTL/",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node serve.js",
     "test": "node --test test/*.test.mjs",
