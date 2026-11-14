@@ -4,7 +4,9 @@ Turn any place on Earth into a 3D-printable model. Find a location, draw the are
 
 Everything runs in your browser. There's no account, no API key and no build step.
 
-![Topoforge: a terrain model of the Bernese Oberland with lakes and rivers, ready to download](img/screenshot.png)
+![Topoforge: a print area drawn over the Bernese Oberland, with the settings panel](img/screenshot.png)
+
+![The finished model in the preview pop-up, ready to download (dark theme)](img/screenshot-model.png)
 
 ## Features
 
@@ -43,7 +45,9 @@ There's also a hosted copy at **https://jahitjanberk.github.io/Topoforge/**.
 
 Tips:
 - Press **3** (or click **3D**) for a 3D terrain view of the map.
-- The settings panel warns you before generating when the area is too big for some layers. At country scale, streets and houses are far too small to print, so they're left out automatically.
+- The **?** in the header reopens the short introduction; the moon/sun button switches dark and light themes (it follows your system by default).
+- On a phone, the settings live in a sheet at the bottom: drag or tap its handle to show more.
+- Before you generate, the panel shows an estimated file size, and says under the layer chips when the scale leaves something out. At country scale, streets and houses are far too small to print, so they're left out automatically.
 - Very large models can be slow in slicers. The 3MF download is several times smaller than the STL.
 
 ## Troubleshooting

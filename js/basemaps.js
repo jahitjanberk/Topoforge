@@ -14,7 +14,7 @@ const OSM = {
 const DEM_ATTR = 'Elevation: <a href="https://registry.opendata.aws/terrain-tiles/">Mapzen / AWS Terrain Tiles</a>';
 
 // OSM's tile policy requires a Referer; send the page origin explicitly.
-const osmLayer = () => L.tileLayer(OSM.url, { maxNativeZoom: OSM.maxNativeZoom, maxZoom: 20, attribution: OSM.attribution, referrerPolicy: 'strict-origin-when-cross-origin' });
+const osmLayer = () => L.tileLayer(OSM.url, { maxNativeZoom: OSM.maxNativeZoom, maxZoom: 20, attribution: OSM.attribution, referrerPolicy: 'strict-origin-when-cross-origin', className: 'osm-layer' });
 
 /* ---------- relief (hillshade) ---------- */
 // Sun from the north-west, 45° up. Azimuth is converted to the math-angle convention used below.

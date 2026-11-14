@@ -67,6 +67,8 @@ await send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 900, dev
 await send('Page.navigate', { url: APP });
 for (let i = 0; i < 60 && !(await evaluate('!!window.__topoforge').catch(() => false)); i++) await sleep(250);
 await evaluate(`window.__checkSolid = ${checkSolid.toString()}; true`);
+const dismissWelcome = () => evaluate(`(() => { const b = document.querySelector('#welcomeGo'); if (b && !document.querySelector('#welcome').classList.contains('hidden')) b.click(); return true; })()`);
+await dismissWelcome(); // first-visit welcome card
 
 // ---------- page helpers ----------
 const setArea = (lat, lng, zoom, layers) => evaluate(`(() => {
@@ -244,6 +246,7 @@ const SCENARIOS = {
     await send('Page.reload');
     for (let i = 0; i < 60 && !(await evaluate('!!window.__topoforge').catch(() => false)); i++) await sleep(250);
     await evaluate(`window.__checkSolid = ${checkSolid.toString()}; true`); // the reload cleared the injected helper
+    await dismissWelcome();
     const r = await evaluate(`(() => { const c = window.__topoforge.map.getCenter();
       return { lat: +c.lat.toFixed(3), label: document.querySelector('#tLabel').value, oldGone: localStorage.getItem('mapcast-v1') === null, newKey: !!localStorage.getItem('topoforge-v1'),
         title: document.title, brand: document.querySelector('.brand h1').textContent }; })()`);

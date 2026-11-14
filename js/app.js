@@ -5,7 +5,7 @@
 const Topoforge = globalThis.Topoforge = globalThis.Topoforge || {};
 
 const { $, $$ } = Topoforge;
-const { D2R, toLocal, fromLocal, rot, fmtLen, fmtArea, signedArea, bbox, cleanRing, simplifyDP } = Topoforge;
+const { D2R, toLocal, fromLocal, rot, fmtLen, fmtArea, signedArea, bbox, cleanRing, simplifyDP, tileXY } = Topoforge;
 const { osmLayer, reliefLayer } = Topoforge;
 const { createTerrainView } = Topoforge;
 const { createGenerator } = Topoforge;
@@ -262,6 +262,7 @@ function flash(msg) { const h = $('#hint'); h.innerHTML = msg; clearTimeout(flas
 function setTool(t) {
   if (t !== 'select' && state.view3d) set3D(false); // drawing happens on the 2D map
   if (pen && t !== 'pen') penCancel();
+  if (t !== 'select') setSheet('peek'); // phones: tuck the settings away while drawing
   state.tool = t;
   $$('[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
   const drawing = t !== 'select';
@@ -519,8 +520,13 @@ function numInput(id, label, unit) { return `<label>${label}<div class="unit"><i
 function updateAreaPanel() {
   const el = $('#areaInfo'), s = state.shape;
   $('#generate').disabled = busy ? !generator.cancellable : !s;
+  // Say why Generate is disabled, and point at the drawing tools until an area exists.
+  if (!busy && $('#genText')) $('#genText').textContent = s ? 'Generate 3D model' : 'Draw an area to generate';
+  $('#mapwrap').classList.toggle('no-area', !s);
   if (!s) {
-    if (areaPanelType !== 'none') { el.innerHTML = '<p class="empty">Choose a tool, then draw on the map. Tip: a single click drops a ready-sized shape you can then drag and resize.</p>'; areaPanelType = 'none'; }
+    if (areaPanelType !== 'none') { el.innerHTML = '<p class="empty"><b>Draw it on the map</b> with the tools at the top of the map: drag to draw, or click once to drop a ready-sized area you can move and resize.</p>'; areaPanelType = 'none'; }
+    $('#estimate').classList.add('hidden'); $('#scaleNote').classList.add('hidden');
+    $$('.chip.dropped').forEach(c => c.classList.remove('dropped'));
     return;
   }
   if (areaPanelType !== s.type) {
@@ -559,15 +565,47 @@ function updateAreaPanel() {
   $('#oTiles').textContent = tiled ? `${Math.round(m.w * k / S.tilesX)} × ${Math.round(m.h * k / S.tilesY)} mm each` : 'Off';
   $('#aMeta').innerHTML = `${s.type === 'poly' ? `<b>${dimsText(s)}</b> · ${s.pts.length} points<br>` : ''}Area <b>${fmtArea(m.area)}</b><br>Model <b>${Math.round(m.w * k)} × ${Math.round(m.h * k)} mm</b> · scale 1:${r3.toLocaleString()}${tiled ? `<br>${S.tilesX * S.tilesY} tiles of up to <b>${Math.round(m.w * k / S.tilesX)} × ${Math.round(m.h * k / S.tilesY)} mm</b>` : ''}`;
   const km2 = m.area / 1e6;
-  let warn = '';
-  // What the map scale will leave out (the model builder applies the same rule).
+  // What the map scale will leave out (the model builder applies the same rule), shown right
+  // under the layer chips it affects.
   const detail = Topoforge.detailForScale(ratio, S.paths), dropped = [];
-  if (S.buildings && !detail.buildings) dropped.push('buildings');
-  if (S.roads && detail.level) dropped.push(`smaller roads (only ${detail.level} are kept)`);
-  if (dropped.length) warn = `At 1:${r3.toLocaleString()} some detail is too small to print, so the model leaves out ${dropped.join(' and ')}.`;
-  else if (S.buildings && km2 > 25) warn = `Large area for buildings (${km2.toFixed(0)} km²). Downloading may be slow or time out — consider a smaller area or terrain only.`;
+  const noBuildings = S.buildings && !detail.buildings;
+  if (noBuildings) dropped.push('buildings are left out (too small to print)');
+  if (S.roads && detail.level) dropped.push(`roads: only ${detail.level}`);
+  $('#lBuildings').parentElement.classList.toggle('dropped', noBuildings);
+  $('#scaleNote').classList.toggle('hidden', !dropped.length);
+  $('#scaleNote').textContent = dropped.length ? `At 1:${r3.toLocaleString()}: ${dropped.join('; ')}.` : '';
+  let warn = '';
+  if (S.buildings && !noBuildings && km2 > 25) warn = `Large area for buildings (${km2.toFixed(0)} km²). Downloading may be slow or time out — consider a smaller area or terrain only.`;
   else if (S.terrain && !S.buildings && !S.roads && km2 < 0.5) warn = 'Small area with terrain only — it may print almost flat. Increase exaggeration or add buildings.';
   $('#aWarn').innerHTML = warn ? `<div class="warn">${warn}</div>` : '';
+  updateEstimate(s, S, m, k, detail);
+}
+
+// Rough file size before generating. The terrain is predictable (the mesh keeps to a vertex budget
+// set by the detail and the elevation data's resolution, and is often smaller); buildings and
+// roads depend on how dense the area is, so they're only mentioned.
+function updateEstimate(s, S, m, k, detail) {
+  const el = $('#estimate');
+  let tris = 0;
+  const areaMm = m.area * k * k, perimMm = 2 * (m.w + m.h) * k;
+  if (S.terrain) {
+    const b = L.latLngBounds(shapeRing(s, 32)).pad(0.05);
+    let z;
+    for (z = 15; z >= 1; z--) {
+      const a = tileXY(b.getNorth(), b.getWest(), z), c = tileXY(b.getSouth(), b.getEast(), z);
+      if ((Math.floor(c.x) - Math.floor(a.x) + 1) * (Math.floor(c.y) - Math.floor(a.y) + 1) <= 36) break;
+    }
+    const resM = 156543.03392 * Math.cos(b.getCenter().lat * D2R) / 2 ** z;
+    const h = Math.max(S.detail, resM * k * 0.7, Math.sqrt(areaMm / 220000));
+    tris = 2 * areaMm / (0.866 * h * h) + 4 * perimMm / h;
+    if (S.stepped) tris *= 1.6;
+    if (S.water) tris *= 1.15;
+  } else tris = 4 * perimMm / 4 + 200;
+  const mb = tris * 50 / 1048576, fmt = v => v < 10 ? v.toFixed(1) : Math.round(v).toString();
+  const extra = (S.buildings && detail.buildings) || S.roads ? ', plus buildings and roads (more in cities)' : '';
+  el.classList.remove('hidden');
+  el.classList.toggle('big', mb > 50);
+  el.innerHTML = `Estimated size: up to <b>${fmt(mb)} MB</b> STL (≈ ${fmt(mb / 4)} MB as 3MF)${extra}.${mb > 50 ? ' Large for some slicers: try Draft detail or a smaller model.' : ''}`;
 }
 function render(force) {
   drawShapeLayer(); syncHandles(force); updateAreaPanel();
@@ -625,6 +663,7 @@ const setSurface = v => { $$('#surface button').forEach(x => x.classList.toggle(
 $$('#surface button').forEach(b => b.onclick = () => { setSurface(b.dataset.v); save(); });
 ['lTerrain', 'lWater', 'lBuildings', 'lRoads', 'lPaths', 'lRoute', 'cSea'].forEach(id => $('#' + id).addEventListener('change', () => { syncLayerUi(); updateAreaPanel(); save(); }));
 $('#tLabel').addEventListener('change', save);
+$('#tLabel').addEventListener('input', syncLayerUi); // the label height setting appears with text
 ['selTX', 'selTY'].forEach(id => $('#' + id).addEventListener('change', () => { syncLayerUi(); updateAreaPanel(); save(); }));
 $('#cKeys').addEventListener('change', save);
 $('#labelPlace').onclick = () => {
@@ -633,20 +672,21 @@ $('#labelPlace').onclick = () => {
   save();
 };
 function syncLayerUi() {
-  const terrain = $('#lTerrain').checked;
-  $('#fExag').style.opacity = terrain ? 1 : .4;
-  $('#fSurface').style.opacity = terrain ? 1 : .4;
-  $('#fKeys').classList.toggle('hidden', (+$('#selTX').value || 1) * (+$('#selTY').value || 1) <= 1);
-  $('#fStep').classList.toggle('hidden', !(terrain && $('#surface button.active')?.dataset.v === 'stepped'));
-  // Water is cut into the terrain surface, so it needs terrain.
+  // Show only the settings that apply to the current choices.
+  const on = id => $('#' + id).checked, show = (id, yes) => $('#' + id).classList.toggle('hidden', !yes);
+  const terrain = on('lTerrain'), water = terrain && on('lWater');
+  show('gTerrain', terrain);
+  show('fKeys', (+$('#selTX').value || 1) * (+$('#selTY').value || 1) > 1);
+  show('fStep', terrain && $('#surface button.active')?.dataset.v === 'stepped');
+  // Water is cut into the terrain surface, so it needs terrain; footpaths are a kind of road.
   $('#lWater').disabled = !terrain;
-  $('#lWater').parentElement.style.opacity = terrain ? 1 : .4;
-  $('#fWater').style.opacity = terrain && $('#lWater').checked ? 1 : .4;
+  $('#lPaths').disabled = !on('lRoads');
   // The Route chip only shows once a GPX route is loaded.
   $('#lRoute').parentElement.classList.toggle('hidden', !state.route);
-  $('#fRoute').classList.toggle('hidden', !state.route);
-  $('#lPaths').disabled = !$('#lRoads').checked;
-  $('#lPaths').parentElement.style.opacity = $('#lRoads').checked ? 1 : .4;
+  // Fine-tuning: each setting only when its layer is in the model.
+  const fine = { fBuild: on('lBuildings'), fRoads: on('lRoads'), fRoute: !!state.route && on('lRoute'), fLabelH: !!$('#tLabel').value.trim(), fWater: water, fSea: terrain };
+  for (const [id, yes] of Object.entries(fine)) show(id, yes);
+  show('advEmpty', !Object.values(fine).some(Boolean));
 }
 function readSettings() {
   return {
@@ -754,6 +794,66 @@ function slug() {
   const base = state.place || (state.shape ? (() => { const c = L.latLngBounds(shapeRing(state.shape, 16)).getCenter(); return `${c.lat.toFixed(4)}_${c.lng.toFixed(4)}`; })() : 'model');
   return 'topoforge-' + base.toLowerCase().replace(/[^a-z0-9_.-]+/g, '-').replace(/^-|-$/g, '');
 }
+/* ---------- theme ---------- */
+// Follows the system unless chosen here; the choice is remembered (applied early by index.html).
+const THEME_KEY = 'topoforge-theme';
+const effectiveTheme = () => document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+$('#themeBtn').onclick = () => {
+  const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* storage unavailable */ }
+};
+
+/* ---------- welcome ---------- */
+const WELCOME_KEY = 'topoforge-welcome-v1';
+function openWelcome() { $('#welcome').classList.remove('hidden'); $('#welcomeGo').focus(); }
+function closeWelcome() {
+  $('#welcome').classList.add('hidden');
+  try { localStorage.setItem(WELCOME_KEY, '1'); } catch (e) { /* storage unavailable */ }
+  $('#q').focus();
+}
+$('#helpBtn').onclick = openWelcome;
+$('#welcomeGo').onclick = closeWelcome;
+$('#welcome').addEventListener('click', e => { if (e.target === $('#welcome')) closeWelcome(); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#welcome').classList.contains('hidden')) { e.stopImmediatePropagation(); closeWelcome(); } }, true);
+
+/* ---------- phones: settings in a bottom sheet ---------- */
+// Three heights: peek (search + Generate), half, full. Drag the handle or tap it to cycle.
+const phone = matchMedia('(max-width: 820px)');
+const SHEET = { peek: () => 292, half: () => Math.round(innerHeight * 0.55), full: () => Math.round(innerHeight * 0.92) };
+let sheetState = 'peek';
+function setSheet(stateName, px) {
+  if (!phone.matches) { document.documentElement.style.removeProperty('--sheet-h'); return; }
+  sheetState = stateName || sheetState;
+  document.documentElement.style.setProperty('--sheet-h', (px ?? SHEET[sheetState]()) + 'px');
+  $('#sheetHandle').setAttribute('aria-label', sheetState === 'full' ? 'Show less' : 'Show more settings');
+}
+$('#sheetHandle').onclick = () => setSheet({ peek: 'half', half: 'full', full: 'peek' }[sheetState]);
+$('#sheetHandle').addEventListener('pointerdown', e => {
+  if (!phone.matches) return;
+  const startY = e.clientY, startH = $('#panel').getBoundingClientRect().height;
+  let moved = false;
+  $('#panel').classList.add('dragging');
+  const move = ev => {
+    if (Math.abs(ev.clientY - startY) > 4) moved = true;
+    setSheet(null, Math.max(120, Math.min(innerHeight * 0.94, startH + startY - ev.clientY)));
+  };
+  const up = () => {
+    window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
+    $('#panel').classList.remove('dragging');
+    if (!moved) return; // a tap: the click handler cycles
+    const h = $('#panel').getBoundingClientRect().height;
+    const nearest = Object.keys(SHEET).reduce((a, b) => Math.abs(SHEET[a]() - h) < Math.abs(SHEET[b]() - h) ? a : b);
+    setSheet(nearest);
+    $('#sheetHandle').addEventListener('click', ev => ev.stopImmediatePropagation(), { once: true, capture: true });
+  };
+  window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+});
+phone.addEventListener('change', () => setSheet('peek'));
+addEventListener('resize', () => setSheet());
+$('#q').addEventListener('focus', () => { if (phone.matches) setSheet('full'); });
+$('#q').addEventListener('keydown', e => { if (e.key === 'Enter' && phone.matches) setTimeout(() => setSheet('peek'), 50); });
+
 /* ---------- boot ---------- */
 // One-time move of data saved under the app's old name (Mapcast), so returning users keep it.
 try {
@@ -769,5 +869,7 @@ try { const r = JSON.parse(localStorage.getItem(ROUTE_STORE) || 'null'); if (r &
 syncLayerUi();
 setTool('select');
 if (saved && saved.view3d) set3D(true);
+setSheet('peek');
+try { if (!localStorage.getItem(WELCOME_KEY)) openWelcome(); } catch (e) { /* storage unavailable */ }
 window.__topoforge = { state, map, generate, setTool, readSettings, get lastModel() { return lastModel; } };
 })();
