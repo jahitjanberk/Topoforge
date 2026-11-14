@@ -60,11 +60,11 @@ js/
 
 ## Downloads
 
-- **Download 3MF** (main button): one file with every part named and coloured, grouped as one object (or one object per tile). Slicers that read 3MF components and base-material colours (PrusaSlicer, Bambu Studio, OrcaSlicer, Cura) open it ready for multi-colour printing.
+- **Download 3MF** (main button): one file with every part named and coloured, as one object (or one object per tile). Verified in PrusaSlicer 2.9.7: it opens as one object with each part as a named volume, kept in place and ready to give each a filament. Bambu Studio and OrcaSlicer descend from PrusaSlicer but haven't been tested. Cura reads only the standard 3MF layout, where each piece is a single mesh; use the single-part STLs there.
 - **Download STL**: the whole model as one single-colour STL.
 - **Parts / tiles list**: single-part STLs, and with tiles, one 3MF per tile.
 
-The 3MF writer (`js/threemf.js`) needs no library: it builds the XML with shared vertices and writes the zip itself, compressing with the browser's `CompressionStream`.
+The 3MF writer (`js/threemf.js`) needs no library: it builds the XML with shared vertices and writes the zip itself, compressing with the browser's `CompressionStream`. Each piece is one mesh with its parts stored back to back. `Metadata/Slic3r_PE_model.config` names each part's triangle range, the way PrusaSlicer stores multi-part objects. With plain 3MF components instead, PrusaSlicer splits the parts into separate objects and drops each onto the bed, so buildings and roads lose their place on the terrain.
 
 ## Tiles
 

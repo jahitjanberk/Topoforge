@@ -1,9 +1,7 @@
-/* 3MF export: one file holding every part, named and coloured, so a slicer (PrusaSlicer, Bambu
-   Studio, OrcaSlicer, Cura) opens a multi-colour model as one object made of parts.
-   Layout: each part is a mesh object with a colour from <basematerials>; the parts of one piece
-   (the whole model, or one tile) are grouped as components of a parent object, which is the
-   build item. A 3MF file is a zip; this has a small zip writer (deflate via CompressionStream,
-   falling back to no compression). Works in browsers and in Node 18+. */
+/* 3MF export: one file holding every part, named and coloured, so a slicer opens a multi-colour
+   model as one object made of parts (layout notes at to3MF). A 3MF file is a zip; this has a
+   small zip writer (deflate via CompressionStream, falling back to no compression).
+   Works in browsers and in Node 18+. */
 (() => {
 'use strict';
 const Mapcast = globalThis.Mapcast = globalThis.Mapcast || {};
@@ -65,42 +63,66 @@ const hexColor = c => (c.length === 4 ? '#' + [...c.slice(1)].map(x => x + x).jo
 // Triangle soup → indexed mesh XML. Vertices are shared by exact float value, so a watertight
 // soup becomes a watertight indexed mesh.
 function meshXml(arr) {
+  const m = { verts: [], tris: [] };
+  appendPart(m, arr, null);
+  return `<mesh><vertices>${m.verts.join('')}</vertices><triangles>${m.tris.join('')}</triangles></mesh>`;
+}
+
+// Appends one part to a merged mesh {verts, tris} (XML strings). Each part keeps its own vertices,
+// so it stays a closed solid on its own. p1: material index for these triangles (null = default).
+// Returns the part's triangle range [first, last] within the mesh.
+function appendPart(m, arr, p1) {
   const f32 = arr instanceof Float32Array ? arr : Float32Array.from(arr);
   const bits = new Uint32Array(f32.buffer, f32.byteOffset, f32.length);
-  const index = new Map(), verts = [], tris = [];
+  const index = new Map(), base = m.verts.length, first = m.tris.length;
+  const mat = p1 == null ? '' : ` p1="${p1}"`;
   const vid = i => {
     const k = bits[i] + ',' + bits[i + 1] + ',' + bits[i + 2];
     let v = index.get(k);
-    if (v === undefined) { v = index.size; index.set(k, v); verts.push(`<vertex x="${num(f32[i])}" y="${num(f32[i + 1])}" z="${num(f32[i + 2])}"/>`); }
+    if (v === undefined) { v = base + index.size; index.set(k, v); m.verts.push(`<vertex x="${num(f32[i])}" y="${num(f32[i + 1])}" z="${num(f32[i + 2])}"/>`); }
     return v;
   };
   for (let i = 0; i < f32.length; i += 9) {
     const a = vid(i), b = vid(i + 3), c = vid(i + 6);
-    if (a !== b && b !== c && a !== c) tris.push(`<triangle v1="${a}" v2="${b}" v3="${c}"/>`);
+    if (a !== b && b !== c && a !== c) m.tris.push(`<triangle v1="${a}" v2="${b}" v3="${c}"${mat}/>`);
   }
-  return `<mesh><vertices>${verts.join('')}</vertices><triangles>${tris.join('')}</triangles></mesh>`;
+  return [first, m.tris.length - 1];
 }
 
-// pieces: [{ name, parts: [{ name, color, arr }] }] — one build item per piece (whole model or tile).
+// pieces: [{ name, parts: [{ name, color, arr }] }] — one object per piece (whole model or tile).
+//
+// Layout: each piece is ONE object whose mesh holds all its parts back to back, with each part's
+// triangles tagged with its colour (core-spec basematerials). Metadata/Slic3r_PE_model.config names
+// each part's triangle range as a volume — that is how PrusaSlicer (and slicers derived from it)
+// store multi-part objects. With plain 3MF components instead, PrusaSlicer splits the parts into
+// separate objects and drops each onto the bed, losing their relative heights.
 async function to3MF(pieces, { title = 'Mapcast model' } = {}) {
   const colors = [], colorIndex = new Map();
   for (const pc of pieces) for (const p of pc.parts) {
     const k = p.name + '|' + p.color;
     if (!colorIndex.has(k)) { colorIndex.set(k, colors.length); colors.push(p); }
   }
-  const objects = [], items = [];
+  const objects = [], items = [], configs = [];
   let id = 2; // 1 = basematerials
   for (const pc of pieces) {
-    const partIds = [];
-    for (const p of pc.parts) {
-      objects.push(`<object id="${id}" type="model" name="${esc(p.name)}" pid="1" pindex="${colorIndex.get(p.name + '|' + p.color)}">${meshXml(p.arr)}</object>`);
-      partIds.push(id++);
+    const m = { verts: [], tris: [] }, volumes = [];
+    const parts = pc.parts.filter(p => p.arr.length);
+    const def = parts.length ? colorIndex.get(parts[0].name + '|' + parts[0].color) : 0; // object default: first part
+    for (const p of parts) {
+      const ci = colorIndex.get(p.name + '|' + p.color);
+      const [first, last] = appendPart(m, p.arr, ci === def ? null : ci);
+      if (last >= first) volumes.push({ name: p.name, first, last });
     }
-    objects.push(`<object id="${id}" type="model" name="${esc(pc.name)}"><components>${partIds.map(p => `<component objectid="${p}"/>`).join('')}</components></object>`);
-    items.push(`<item objectid="${id++}"/>`);
+    objects.push(`<object id="${id}" type="model" name="${esc(pc.name)}" pid="1" pindex="${def}"><mesh><vertices>${m.verts.join('')}</vertices><triangles>${m.tris.join('')}</triangles></mesh></object>`);
+    items.push(`<item objectid="${id}" printable="1"/>`);
+    configs.push(` <object id="${id}" instances_count="1">\n  <metadata type="object" key="name" value="${esc(pc.name)}"/>\n` +
+      volumes.map(v => `  <volume firstid="${v.first}" lastid="${v.last}">\n   <metadata type="volume" key="name" value="${esc(v.name)}"/>\n   <metadata type="volume" key="volume_type" value="ModelPart"/>\n   <metadata type="volume" key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>\n  </volume>\n`).join('') +
+      ' </object>');
+    id++;
   }
   const model = `<?xml version="1.0" encoding="UTF-8"?>
-<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
+<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:slic3rpe="http://schemas.slic3r.org/3mf/2017/06">
+<metadata name="slic3rpe:Version3mf">1</metadata>
 <metadata name="Title">${esc(title)}</metadata>
 <metadata name="Application">Mapcast</metadata>
 <metadata name="Copyright">Map data © OpenStreetMap contributors; elevation: Mapzen / AWS Terrain Tiles</metadata>
@@ -112,9 +134,10 @@ ${objects.join('\n')}
 </model>`;
   const enc = new TextEncoder();
   return zip([
-    { name: '[Content_Types].xml', data: enc.encode('<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>') },
+    { name: '[Content_Types].xml', data: enc.encode('<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/><Default Extension="config" ContentType="text/xml"/></Types>') },
     { name: '_rels/.rels', data: enc.encode('<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>') },
-    { name: '3D/3dmodel.model', data: enc.encode(model) }
+    { name: '3D/3dmodel.model', data: enc.encode(model) },
+    { name: 'Metadata/Slic3r_PE_model.config', data: enc.encode(`<?xml version="1.0" encoding="UTF-8"?>\n<config>\n${configs.join('\n')}\n</config>\n`) }
   ]).then(b => new Blob([b], { type: 'model/3mf' }));
 }
 
