@@ -212,9 +212,14 @@ function splitWater(T, zOf, isWater, depth) {
 function addPrism(o, outer, holes, zb, zt) {
   if (signedArea(outer) < 0) outer = outer.slice().reverse();
   holes = holes.map(h => signedArea(h) > 0 ? h.slice().reverse() : h);
-  const pts = outer.slice(), flat = [], hi = [];
-  outer.forEach(p => flat.push(p.x, p.y));
-  for (const h of holes) { hi.push(flat.length / 2); h.forEach(p => { flat.push(p.x, p.y); pts.push(p); }); }
+  // earcut joins each hole to the outline with a bridge found by a horizontal ray. On axis-aligned
+  // outlines (pixel-traced text, many buildings) that bridge can run exactly through other vertices,
+  // leaving T-junctions (open edges). Triangulating in a slightly rotated frame avoids it; the
+  // triangles still use the original points.
+  const pts = outer.slice(), flat = [], hi = [], ca = Math.cos(0.1), sa = Math.sin(0.1);
+  const put = p => flat.push(p.x * ca - p.y * sa, p.x * sa + p.y * ca);
+  outer.forEach(put);
+  for (const h of holes) { hi.push(flat.length / 2); h.forEach(p => { put(p); pts.push(p); }); }
   const tr = earcut(flat, hi.length ? hi : null);
   if (!tr.length) return false;
   const flip = earcutWinding(tr, i => pts[i]) < 0; // top faces must be CCW

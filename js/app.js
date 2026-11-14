@@ -610,11 +610,17 @@ function pick(r) {
 /* =====================================================================
    Settings
    ===================================================================== */
-const sliders = [['sSize', 'oSize', v => `${v} mm`], ['sBase', 'oBase', v => `${v} mm`], ['sExag', 'oExag', v => `${(+v).toFixed(1)}×`], ['sBH', 'oBH', v => `${(+v).toFixed(1)}×`], ['sBMin', 'oBMin', v => `${(+v).toFixed(1)} mm`], ['sRW', 'oRW', v => `${(+v).toFixed(1)} mm`], ['sRH', 'oRH', v => `${(+v).toFixed(1)} mm`], ['sWD', 'oWD', v => `${(+v).toFixed(1)} mm`], ['sRtW', 'oRtW', v => `${(+v).toFixed(1)} mm`], ['sRtH', 'oRtH', v => `${(+v).toFixed(1)} mm`]];
+const sliders = [['sSize', 'oSize', v => `${v} mm`], ['sBase', 'oBase', v => `${v} mm`], ['sExag', 'oExag', v => `${(+v).toFixed(1)}×`], ['sBH', 'oBH', v => `${(+v).toFixed(1)}×`], ['sBMin', 'oBMin', v => `${(+v).toFixed(1)} mm`], ['sRW', 'oRW', v => `${(+v).toFixed(1)} mm`], ['sRH', 'oRH', v => `${(+v).toFixed(1)} mm`], ['sWD', 'oWD', v => `${(+v).toFixed(1)} mm`], ['sRtW', 'oRtW', v => `${(+v).toFixed(1)} mm`], ['sRtH', 'oRtH', v => `${(+v).toFixed(1)} mm`], ['sLblH', 'oLblH', v => `${(+v).toFixed(1)} mm`]];
 sliders.forEach(([s, o, f]) => { const el = $('#' + s); const upd = () => { $('#' + o).textContent = f(el.value); }; el.addEventListener('input', () => { upd(); updateAreaPanel(); }); el.addEventListener('change', save); upd(); });
 $('#sExag').addEventListener('input', () => { terrain3d.setExaggeration(+$('#sExag').value); if (state.view3d) setHint(); });
 $$('#detail button').forEach(b => b.onclick = () => { $$('#detail button').forEach(x => x.classList.toggle('active', x === b)); save(); });
 ['lTerrain', 'lWater', 'lBuildings', 'lRoads', 'lPaths', 'lRoute', 'cSea'].forEach(id => $('#' + id).addEventListener('change', () => { syncLayerUi(); updateAreaPanel(); save(); }));
+$('#tLabel').addEventListener('change', save);
+$('#labelPlace').onclick = () => {
+  const c = state.shape ? L.latLngBounds(shapeRing(state.shape, 16)).getCenter() : map.getCenter();
+  $('#tLabel').value = state.place || `${c.lat.toFixed(4)}°, ${c.lng.toFixed(4)}°`;
+  save();
+};
 function syncLayerUi() {
   const terrain = $('#lTerrain').checked;
   $('#fExag').style.opacity = terrain ? 1 : .4;
@@ -636,7 +642,8 @@ function readSettings() {
     terrain: $('#lTerrain').checked, buildings: $('#lBuildings').checked, roads: $('#lRoads').checked,
     paths: $('#lRoads').checked && $('#lPaths').checked, sea: $('#cSea').checked,
     water: $('#lTerrain').checked && $('#lWater').checked, waterDepth: +$('#sWD').value,
-    route: state.route && $('#lRoute').checked ? state.route.segs : null, routeW: +$('#sRtW').value, routeH: +$('#sRtH').value
+    route: state.route && $('#lRoute').checked ? state.route.segs : null, routeW: +$('#sRtW').value, routeH: +$('#sRtH').value,
+    label: $('#tLabel').value.trim(), labelH: +$('#sLblH').value
   };
 }
 

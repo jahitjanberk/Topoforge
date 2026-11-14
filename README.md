@@ -37,6 +37,7 @@ js/
   model.js        print area + settings → mesh layers (no DOM; runs in the worker)
   water.js        rasterised water mask: lake levels, rivers, shoreline points
   gpx.js          GPX parser (tracks + routes) and route simplification
+  label.js        text → traced outlines for the raised label
   mesh.js         terrain / water / building / road mesh builders
   data.js         elevation tiles + OpenStreetMap (Overpass) download
   geo.js          projection and 2D geometry helpers
@@ -54,6 +55,10 @@ js/
 ## GPX routes
 
 **Import a GPX route…** in step 2, or drop a `.gpx` file on the map. Track segments and routes are read; waypoints are ignored. The route is drawn on the 2D map and in the 3D view, and the print area is fitted around it unless it's already inside one. In the model it becomes a raised strip that follows the terrain, as its own `*-route.stl` part. Width and height are under Advanced.
+
+## Label
+
+Type a **Label on the base** (or click *Use place name*) to add a plate along the front edge of the model, with the text raised on it as its own `*-label.stl` part. The plate is part of the base. Text height scales with the model width, and long text is shrunk to fit. The text is drawn in a bold system font, traced into outlines (letter holes kept), and extruded, so any font or script the browser can draw works.
 
 ## Water
 

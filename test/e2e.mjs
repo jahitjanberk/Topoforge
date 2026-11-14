@@ -133,6 +133,15 @@ const SCENARIOS = {
     await screenshot('route.png');
     await evaluate(`document.querySelector('#pvClose').click(), document.querySelector('#routeDel').click(), true`);
   },
+  async label() {
+    await setArea(46.6863, 7.8632, 14, { lTerrain: 1 });
+    await evaluate(`(() => { const t = document.querySelector('#tLabel'); t.value = 'Interlaken 46.69°N'; t.dispatchEvent(new Event('change')); return true; })()`);
+    const r = await generate();
+    await evaluate(`(() => { const t = document.querySelector('#tLabel'); t.value = ''; t.dispatchEvent(new Event('change')); return true; })()`);
+    check('label generates as its own part', !r.failed && !!r.parts.label, `${r.ms} ms · ${r.status}`);
+    check('label and base (with plate) are closed', !!r.parts.label && partsOk(r.parts), JSON.stringify({ terrain: r.parts.terrain, label: r.parts.label }));
+    await screenshot('label.png');
+  },
   async cancel() {
     await setArea(46.5586, 7.8357, 11, { lTerrain: 1 });
     await evaluate(`document.querySelector('#detail button[data-v="0.4"]').click(), true`);

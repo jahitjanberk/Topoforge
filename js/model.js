@@ -9,6 +9,7 @@ const { Bounds, toLocal, fromLocal, simplifyDP, haversineKm, bbox, cleanRing, si
 const { loadElevation, fetchOverpass, parseOSM, buildingHeight, ROADS, PATHS } = Mapcast;
 const { buildTerrain, terrainSolid, refineWater, splitWater, addPrism, addRoadBox } = Mapcast;
 const { buildWaterMask, WATER } = Mapcast;
+const { textPolygons } = Mapcast;
 
 const tick = () => new Promise(r => setTimeout(r, 16));
 
@@ -145,19 +146,39 @@ async function buildModel(ringLL, S, onStatus = () => {}) {
     }
   }
 
+  // Label: a plate along the front (south) edge, as tall as the base, with raised text on it.
+  // The plate joins the base part (it overlaps the model by 0.5 mm so it's attached); the text is
+  // its own part for a contrasting colour.
+  let label = [];
+  const labelText = String(S.label || '').trim();
+  if (labelText) {
+    onStatus('Adding the label…', P.done); await tick();
+    const [lx0, ly0, lx1] = bbox(ring), width = lx1 - lx0;
+    const th = Math.min(14, Math.max(5, width * 0.07)), depth = th * 1.9;
+    const plate = [{ x: lx0, y: ly0 - depth }, { x: lx1, y: ly0 - depth }, { x: lx1, y: ly0 + 0.5 }, { x: lx0, y: ly0 + 0.5 }];
+    addPrism(terrain, plate, [], 0, S.base);
+    for (const p of textPolygons(labelText, { cx: (lx0 + lx1) / 2, cy: ly0 - depth / 2, heightMm: th, maxWidthMm: width - th })) {
+      addPrism(label, p.outer, p.holes, S.base - 0.3, S.base + S.labelH);
+    }
+  }
+
   onStatus('Preparing preview…', P.done); await tick();
   const layers = [
     { id: 'terrain', name: S.terrain ? 'Terrain & base' : 'Base', color: '#e3d3b0', arr: new Float32Array(terrain) },
     { id: 'water', name: 'Water', color: '#4a90d9', arr: new Float32Array(water) },
     { id: 'buildings', name: 'Buildings', color: '#fbfaf8', arr: new Float32Array(buildings) },
     { id: 'roads', name: 'Roads', color: '#52525b', arr: new Float32Array(roads) },
-    { id: 'route', name: 'Route', color: '#e11d48', arr: new Float32Array(route) }
+    { id: 'route', name: 'Route', color: '#e11d48', arr: new Float32Array(route) },
+    { id: 'label', name: 'Label', color: '#27272a', arr: new Float32Array(label) }
   ].filter(l => l.arr.length);
-  let maxZ = 0; for (const l of layers) for (let i = 2; i < l.arr.length; i += 3) if (l.arr[i] > maxZ) maxZ = l.arr[i];
-  const [bx0, by0, bx1, by1] = bbox(ring);
+  let maxZ = 0, fx0 = Infinity, fy0 = Infinity, fx1 = -Infinity, fy1 = -Infinity;
+  for (const l of layers) for (let i = 0; i < l.arr.length; i += 3) {
+    const x = l.arr[i], y = l.arr[i + 1], z = l.arr[i + 2];
+    if (z > maxZ) maxZ = z; if (x < fx0) fx0 = x; if (x > fx1) fx1 = x; if (y < fy0) fy0 = y; if (y > fy1) fy1 = y;
+  }
   const tris = layers.reduce((s, l) => s + l.arr.length / 9, 0);
   const stats = [
-    ['Footprint', `${(bx1 - bx0).toFixed(0)} × ${(by1 - by0).toFixed(0)} mm`], ['Height', `${maxZ.toFixed(1)} mm`],
+    ['Footprint', `${(fx1 - fx0).toFixed(0)} × ${(fy1 - fy0).toFixed(0)} mm`], ['Height', `${maxZ.toFixed(1)} mm`],
     ['Scale', `1:${Number((1000 / scale).toPrecision(3)).toLocaleString()}`],
     ...(elev ? [['Elevation range', `${Math.round(T.minE)}–${Math.round(T.maxE)} m`]] : []),
     ...(wantWater ? [['Water', `${(waterShare * 100).toFixed(waterShare < 0.1 ? 1 : 0)}% of area`]] : []),

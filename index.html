@@ -83,6 +83,10 @@
             <button data-v="1.2">Draft</button><button data-v="0.7" class="active">Standard</button><button data-v="0.4">Fine</button>
           </div>
         </div>
+        <div class="field">
+          <div class="lab"><label for="tLabel">Label on the base</label><button type="button" class="linkbtn" id="labelPlace">Use place name</button></div>
+          <input type="text" id="tLabel" class="textin" maxlength="40" placeholder="Optional, e.g. Interlaken" autocomplete="off" spellcheck="false">
+        </div>
         <details class="adv">
           <summary>Advanced</summary>
           <div class="inner">
@@ -111,6 +115,10 @@
                 <div class="lab"><span>Route height</span><output id="oRtH"></output></div>
                 <input type="range" id="sRtH" min="0.4" max="3" step="0.1" value="1">
               </div>
+            </div>
+            <div class="field">
+              <div class="lab"><span>Label text height</span><output id="oLblH"></output></div>
+              <input type="range" id="sLblH" min="0.4" max="2.5" step="0.1" value="0.8">
             </div>
             <div class="field" id="fWater">
               <div class="lab"><span>Water depth</span><output id="oWD"></output></div>
@@ -189,6 +197,7 @@
 <script src="js/mesh.js"></script>
 <script src="js/stl.js"></script>
 <script src="js/water.js"></script>
+<script src="js/label.js"></script>
 <script src="js/model.js"></script>
 <script src="js/generator.js"></script>
 <script src="js/terrain3d.js"></script>
