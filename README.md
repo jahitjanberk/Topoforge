@@ -28,6 +28,8 @@ Turn any place on Earth into a 3D-printable model. Find a location, draw the are
 
 Everything runs in your browser. There's no account, no API key and no build step.
 
+![Topoforge: the 3D terrain view with a print area over Interlaken and the Jungfrau region, next to the settings panel](img/overview.jpg)
+
 ![Topoforge: a print area drawn over the Bernese Oberland, with the settings panel](img/screenshot.png)
 
 ![The finished model in the preview pop-up, ready to download (dark theme)](img/screenshot-model.png)
